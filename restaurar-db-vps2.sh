@@ -176,3 +176,4 @@ echo "   7. Ejecuta: pm2 start ecosystem.config.js"
 echo "   8. Verifica que la aplicación funcione correctamente"
 echo ""
 
+
