@@ -1,0 +1,556 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id                Int                @id @default(autoincrement())
+  email             String             @unique
+  password          String
+  nombre            String
+  rol               String             @default("recepcionista") // admin, doctor, recepcionista
+  activo            Boolean            @default(true)
+  doctorId          Int?               @unique
+  doctor            Doctor?            @relation(fields: [doctorId], references: [id])
+  cortesCaja        CorteCaja[]
+  gastos            Gasto[]
+  permisos          PermisoUsuario[]
+  vaultMovimientos  VaultMovimiento[]
+  abonosTratamiento AbonoTratamiento[]
+  pagosLaboratorio  PagoLaboratorio[]
+  usosMateriales    UsoMaterial[]
+  prestamos         Prestamo[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@map("usuarios")
+}
+
+model Modulo {
+  id          Int              @id @default(autoincrement())
+  nombre      String           @unique
+  descripcion String?
+  ruta        String? // Ruta base del módulo (ej: /pos, /pacientes)
+  icono       String? // Nombre del icono FontAwesome
+  activo      Boolean          @default(true)
+  permisos    PermisoUsuario[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("modulos")
+}
+
+model PermisoUsuario {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  moduloId  Int
+  modulo    Modulo   @relation(fields: [moduloId], references: [id], onDelete: Cascade)
+  acceso    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([usuarioId, moduloId])
+  @@map("permisos_usuarios")
+}
+
+model Doctor {
+  id                   Int                   @id @default(autoincrement())
+  nombre               String
+  apellido             String
+  especialidad         String
+  telefono             String?
+  email                String?               @unique
+  color                String                @default("#3b82f6")
+  activo               Boolean               @default(true)
+  usuario              Usuario?
+  horarios             HorarioDoctor[]
+  citas                Cita[]
+  consultas            Consulta[]
+  ventas               Venta[]
+  tratamientosPlazo    TratamientoPlazo[]
+  serviciosLaboratorio ServicioLaboratorio[]
+  usosMateriales       UsoMaterial[]
+  prestamos            Prestamo[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@map("doctores")
+}
+
+model HorarioDoctor {
+  id         Int     @id @default(autoincrement())
+  doctorId   Int
+  doctor     Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  diaSemana  Int // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  horaInicio String
+  horaFin    String
+  activo     Boolean @default(true)
+
+  @@map("horarios_doctores")
+}
+
+model Paciente {
+  id                   Int                   @id @default(autoincrement())
+  nombre               String
+  apellido             String
+  fechaNacimiento      DateTime?
+  genero               String?
+  telefono             String?
+  email                String?
+  direccion            String?
+  ocupacion            String?
+  contactoEmergencia   String?
+  telefonoEmergencia   String?
+  notas                String?               @db.Text
+  activo               Boolean               @default(true)
+  antecedentes         AntecedenteMedico?
+  citas                Cita[]
+  consultas            Consulta[]
+  archivos             ArchivoPaciente[]
+  ventas               Venta[]
+  tratamientosPlazo    TratamientoPlazo[]
+  gastos               Gasto[]
+  serviciosLaboratorio ServicioLaboratorio[]
+  usosMateriales       UsoMaterial[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@map("pacientes")
+}
+
+model AntecedenteMedico {
+  id              Int      @id @default(autoincrement())
+  pacienteId      Int      @unique
+  paciente        Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  alergias        String?  @db.Text
+  enfermedades    String?  @db.Text
+  medicamentos    String?  @db.Text
+  cirugiasPrevias String?  @db.Text
+  antecedentesFam String?  @db.Text
+  notasMedicas    String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("antecedentes_medicos")
+}
+
+model Consultorio {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  ubicacion String?
+  activo    Boolean  @default(true)
+  citas     Cita[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("consultorios")
+}
+
+model Cita {
+  id            Int          @id @default(autoincrement())
+  pacienteId    Int
+  paciente      Paciente     @relation(fields: [pacienteId], references: [id])
+  doctorId      Int
+  doctor        Doctor       @relation(fields: [doctorId], references: [id])
+  consultorioId Int?
+  consultorio   Consultorio? @relation(fields: [consultorioId], references: [id])
+  fecha         DateTime
+  horaInicio    String
+  horaFin       String
+  motivo        String?      @db.Text
+  estado        String       @default("programada") // programada, completada, cancelada, no_asistio
+  notas         String?      @db.Text
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("citas")
+}
+
+model Consulta {
+  id             Int       @id @default(autoincrement())
+  pacienteId     Int
+  paciente       Paciente  @relation(fields: [pacienteId], references: [id])
+  doctorId       Int
+  doctor         Doctor    @relation(fields: [doctorId], references: [id])
+  fecha          DateTime  @default(now())
+  motivoConsulta String?   @db.Text
+  diagnostico    String?   @db.Text
+  tratamiento    String?   @db.Text
+  observaciones  String?   @db.Text
+  proximaCita    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("consultas")
+}
+
+model ArchivoPaciente {
+  id          Int      @id @default(autoincrement())
+  pacienteId  Int
+  paciente    Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  nombre      String
+  tipo        String
+  ruta        String
+  descripcion String?
+  createdAt   DateTime @default(now())
+
+  @@map("archivos_pacientes")
+}
+
+model Categoria {
+  id          Int        @id @default(autoincrement())
+  nombre      String     @unique
+  descripcion String?    @db.Text
+  color       String? // Color para identificar la categoría
+  activo      Boolean    @default(true)
+  servicios   Servicio[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("categorias")
+}
+
+model Servicio {
+  id                   Int                   @id @default(autoincrement())
+  nombre               String
+  descripcion          String?               @db.Text
+  precio               Decimal               @db.Decimal(10, 2)
+  duracion             Int                   @default(30) // minutos
+  categoriaId          Int?
+  categoria            Categoria?            @relation(fields: [categoriaId], references: [id])
+  activo               Boolean               @default(true)
+  items                VentaItem[]
+  tratamientosPlazo    TratamientoPlazo[]
+  serviciosLaboratorio ServicioLaboratorio[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@map("servicios")
+}
+
+model Producto {
+  id             Int         @id @default(autoincrement())
+  nombre         String
+  descripcion    String?     @db.Text
+  precio         Decimal     @db.Decimal(10, 2)
+  costo          Decimal?    @db.Decimal(10, 2)
+  stock          Int         @default(0)
+  stockMinimo    Int         @default(5)
+  fechaCaducidad DateTime?
+  categoria      String?
+  activo         Boolean     @default(true)
+  items          VentaItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@map("productos")
+}
+
+model Material {
+  id             Int           @id @default(autoincrement())
+  nombre         String
+  descripcion    String?       @db.Text
+  costo          Decimal?      @db.Decimal(10, 2)
+  stock          Int           @default(0)
+  stockMinimo    Int           @default(5)
+  fechaCaducidad DateTime?
+  categoria      String?
+  activo         Boolean       @default(true)
+  usos           UsoMaterial[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@map("materiales")
+}
+
+model UsoMaterial {
+  id            Int      @id @default(autoincrement())
+  materialId    Int
+  material      Material @relation(fields: [materialId], references: [id])
+  pacienteId    Int
+  paciente      Paciente @relation(fields: [pacienteId], references: [id])
+  doctorId      Int
+  doctor        Doctor   @relation(fields: [doctorId], references: [id])
+  tratamientoId Int? // ID del tratamiento o servicio relacionado
+  cantidad      Int      @default(1)
+  observaciones String?  @db.Text
+  usuarioId     Int?
+  usuario       Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("usos_materiales")
+}
+
+model Venta {
+  id                Int                @id @default(autoincrement())
+  folio             String             @unique
+  pacienteId        Int?
+  paciente          Paciente?          @relation(fields: [pacienteId], references: [id])
+  doctorId          Int?
+  doctor            Doctor?            @relation(fields: [doctorId], references: [id])
+  subtotal          Decimal            @db.Decimal(10, 2)
+  descuento         Decimal            @default(0) @db.Decimal(10, 2)
+  total             Decimal            @db.Decimal(10, 2)
+  metodoPago        String             @default("efectivo")
+  banco             String? // Azteca, BBVA, Mercado Pago (solo para tarjeta o transferencia)
+  moneda            String             @default("MXN") // MXN o USD
+  estado            String             @default("completada")
+  notas             String?            @db.Text
+  items             VentaItem[]
+  abonosTratamiento AbonoTratamiento[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@map("ventas")
+}
+
+model VentaItem {
+  id         Int       @id @default(autoincrement())
+  ventaId    Int
+  venta      Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  tipo       String // servicio o producto
+  servicioId Int?
+  servicio   Servicio? @relation(fields: [servicioId], references: [id])
+  productoId Int?
+  producto   Producto? @relation(fields: [productoId], references: [id])
+  cantidad   Int       @default(1)
+  precioUnit Decimal   @db.Decimal(10, 2)
+  subtotal   Decimal   @db.Decimal(10, 2)
+
+  @@map("venta_items")
+}
+
+model CorteCaja {
+  id                            Int      @id @default(autoincrement())
+  fecha                         DateTime @default(now())
+  hora                          String? // "14:00" o "18:00" (null para saldo inicial)
+  // Saldos iniciales por método de pago
+  saldoInicial                  Decimal  @db.Decimal(10, 2)
+  saldoInicialEfectivo          Decimal  @default(0) @db.Decimal(10, 2)
+  saldoInicialTarjetaAzteca     Decimal  @default(0) @db.Decimal(10, 2)
+  saldoInicialTarjetaBbva       Decimal  @default(0) @db.Decimal(10, 2)
+  saldoInicialTarjetaMp         Decimal  @default(0) @db.Decimal(10, 2)
+  saldoInicialTransferencia     Decimal  @default(0) @db.Decimal(10, 2)
+  // Ventas por método de pago
+  ventasEfectivo                Decimal  @default(0) @db.Decimal(10, 2)
+  ventasTarjeta                 Decimal  @default(0) @db.Decimal(10, 2)
+  ventasTransferencia           Decimal  @default(0) @db.Decimal(10, 2)
+  // Desglose de ventas por banco
+  ventasTarjetaAzteca           Decimal  @default(0) @db.Decimal(10, 2)
+  ventasTarjetaBbva             Decimal  @default(0) @db.Decimal(10, 2)
+  ventasTarjetaMp               Decimal  @default(0) @db.Decimal(10, 2)
+  ventasTransferenciaAzteca     Decimal  @default(0) @db.Decimal(10, 2)
+  ventasTransferenciaBbva       Decimal  @default(0) @db.Decimal(10, 2)
+  ventasTransferenciaMp         Decimal  @default(0) @db.Decimal(10, 2)
+  totalVentas                   Decimal  @default(0) @db.Decimal(10, 2)
+  // Saldos finales por método de pago
+  saldoFinal                    Decimal  @db.Decimal(10, 2)
+  saldoFinalEfectivo            Decimal  @default(0) @db.Decimal(10, 2)
+  saldoFinalTarjetaAzteca       Decimal  @default(0) @db.Decimal(10, 2)
+  saldoFinalTarjetaBbva         Decimal  @default(0) @db.Decimal(10, 2)
+  saldoFinalTarjetaMp           Decimal  @default(0) @db.Decimal(10, 2)
+  saldoFinalTransferencia       Decimal  @default(0) @db.Decimal(10, 2)
+  saldoFinalTransferenciaAzteca Decimal  @default(0) @db.Decimal(10, 2)
+  saldoFinalTransferenciaBbva   Decimal  @default(0) @db.Decimal(10, 2)
+  saldoFinalTransferenciaMp     Decimal  @default(0) @db.Decimal(10, 2)
+  diferencia                    Decimal  @default(0) @db.Decimal(10, 2)
+  observaciones                 String?  @db.Text
+  usuarioId                     Int?
+  usuario                       Usuario? @relation(fields: [usuarioId], references: [id])
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
+
+  @@map("cortes_caja")
+}
+
+model ConfiguracionCortes {
+  id         Int      @id @default(autoincrement())
+  horaCorte1 String   @default("14:00") // Primer corte del día
+  horaCorte2 String   @default("18:00") // Segundo corte del día
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("configuracion_cortes")
+}
+
+model ConfiguracionTipoCambio {
+  id         Int      @id @default(autoincrement())
+  tipoCambio Decimal  @db.Decimal(10, 4) // Tipo de cambio USD/MXN
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("configuracion_tipo_cambio")
+}
+
+model ConfiguracionRetiros {
+  id                  Int      @id @default(autoincrement())
+  montoMaximoEfectivo Decimal  @db.Decimal(10, 2) // Monto máximo de efectivo permitido en caja
+  activo              Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("configuracion_retiros")
+}
+
+model Gasto {
+  id            Int          @id @default(autoincrement())
+  motivo        String
+  monto         Decimal      @db.Decimal(10, 2)
+  metodoPago    String       @default("efectivo") // efectivo, tarjeta, transferencia
+  banco         String? // Azteca, BBVA, Mercado Pago (solo para tarjeta o transferencia)
+  observaciones String?      @db.Text
+  tipo          String       @default("general") // general, laboratorio
+  laboratorioId Int?
+  laboratorio   Laboratorio? @relation(fields: [laboratorioId], references: [id], onDelete: SetNull)
+  pacienteId    Int?
+  paciente      Paciente?    @relation(fields: [pacienteId], references: [id], onDelete: SetNull)
+  usuarioId     Int?
+  usuario       Usuario?     @relation(fields: [usuarioId], references: [id])
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("gastos")
+}
+
+model VaultMovimiento {
+  id        Int      @id @default(autoincrement())
+  tipo      String // ingreso, traslado_ahorro, retiro_ahorro
+  metodo    String // efectivo, tarjeta, transferencia, ahorro, bbva, mercadopago, azteca
+  banco     String? // BBVA, Mercado Pago, Azteca (solo para tarjeta o transferencia)
+  monto     Decimal  @db.Decimal(12, 2)
+  nota      String?  @db.Text
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("vault_movimientos")
+}
+
+model TratamientoPlazo {
+  id            Int                @id @default(autoincrement())
+  pacienteId    Int
+  paciente      Paciente           @relation(fields: [pacienteId], references: [id])
+  doctorId      Int
+  doctor        Doctor             @relation(fields: [doctorId], references: [id])
+  servicioId    Int
+  servicio      Servicio           @relation(fields: [servicioId], references: [id])
+  montoTotal    Decimal            @db.Decimal(10, 2)
+  montoPagado   Decimal            @default(0) @db.Decimal(10, 2)
+  montoAdeudado Decimal            @db.Decimal(10, 2)
+  estado        String             @default("pendiente") // pendiente, pagado, cancelado
+  notas         String?            @db.Text
+  abonos        AbonoTratamiento[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@map("tratamientos_plazo")
+}
+
+model AbonoTratamiento {
+  id                 Int              @id @default(autoincrement())
+  tratamientoPlazoId Int
+  tratamientoPlazo   TratamientoPlazo @relation(fields: [tratamientoPlazoId], references: [id], onDelete: Cascade)
+  monto              Decimal          @db.Decimal(10, 2)
+  saldoAnterior      Decimal          @db.Decimal(10, 2)
+  saldoNuevo         Decimal          @db.Decimal(10, 2)
+  ventaId            Int? // Referencia a la venta si se registró desde POS
+  venta              Venta?           @relation(fields: [ventaId], references: [id], onDelete: SetNull)
+  notas              String?          @db.Text
+  usuarioId          Int?
+  usuario            Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@map("abonos_tratamiento")
+}
+
+model Laboratorio {
+  id                   Int                   @id @default(autoincrement())
+  nombre               String
+  contacto             String?
+  telefono             String?
+  activo               Boolean               @default(true)
+  gastos               Gasto[]
+  serviciosLaboratorio ServicioLaboratorio[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@map("laboratorios")
+}
+
+model ServicioLaboratorio {
+  id             Int               @id @default(autoincrement())
+  laboratorioId  Int
+  laboratorio    Laboratorio       @relation(fields: [laboratorioId], references: [id])
+  servicioId     Int
+  servicio       Servicio          @relation(fields: [servicioId], references: [id])
+  pacienteId     Int
+  paciente       Paciente          @relation(fields: [pacienteId], references: [id])
+  doctorId       Int
+  doctor         Doctor            @relation(fields: [doctorId], references: [id])
+  costo          Decimal           @db.Decimal(10, 2)
+  montoPagado    Decimal           @default(0) @db.Decimal(10, 2)
+  saldoPendiente Decimal           @db.Decimal(10, 2)
+  estado         String            @default("pendiente") // pendiente, pagado, cancelado
+  pagos          PagoLaboratorio[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@map("servicios_laboratorio")
+}
+
+model PagoLaboratorio {
+  id                    Int                 @id @default(autoincrement())
+  servicioLaboratorioId Int
+  servicioLaboratorio   ServicioLaboratorio @relation(fields: [servicioLaboratorioId], references: [id], onDelete: Cascade)
+  monto                 Decimal             @db.Decimal(10, 2)
+  metodoPago            String              @default("efectivo") // efectivo, tarjeta, transferencia
+  banco                 String? // Azteca, BBVA, Mercado Pago (solo para tarjeta o transferencia)
+  observaciones         String?             @db.Text
+  usuarioId             Int?
+  usuario               Usuario?            @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@map("pagos_laboratorio")
+}
+
+model ConceptoPrestamo {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  descripcion String?   @db.Text
+  activo      Boolean   @default(true)
+  prestamos   Prestamo[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("conceptos_prestamos")
+}
+
+model Prestamo {
+  id          Int              @id @default(autoincrement())
+  doctorId    Int
+  doctor      Doctor           @relation(fields: [doctorId], references: [id])
+  conceptoId  Int
+  concepto    ConceptoPrestamo @relation(fields: [conceptoId], references: [id])
+  monto       Decimal          @db.Decimal(10, 2)
+  metodoPago  String           @default("efectivo") // efectivo, tarjeta, transferencia
+  banco       String? // Azteca, BBVA, Mercado Pago (solo para tarjeta o transferencia)
+  estatus     String           @default("pendiente") // pendiente, pagado
+  notas       String?          @db.Text
+  usuarioId   Int?
+  usuario     Usuario?         @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@map("prestamos")
+}

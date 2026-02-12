@@ -1,0 +1,101 @@
+<%- include('../layout', { body: `
+${estadisticas && estadisticas.length > 0 ? `
+<div class="mb-6 bg-white rounded-xl shadow-sm p-6">
+  <h2 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+    <i class="fas fa-chart-line text-primary-500"></i>
+    Estadísticas de Deudas
+  </h2>
+  <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+    <div class="flex justify-between items-center">
+      <div>
+        <p class="text-sm text-red-600 font-medium">Total General Adeudado</p>
+        <p class="text-2xl font-bold text-red-700">$${totalGeneral.toFixed(2)}</p>
+      </div>
+      <div class="text-right">
+        <p class="text-sm text-gray-600">${estadisticas.length} laboratorio${estadisticas.length > 1 ? 's' : ''} con deuda</p>
+      </div>
+    </div>
+  </div>
+  <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+    ${estadisticas.map(function(stat) {
+      return '<div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">' +
+        '<div class="flex justify-between items-start mb-2">' +
+          '<h3 class="font-bold text-gray-800">' + stat.laboratorio.nombre + '</h3>' +
+          '<span class="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded">' + stat.cantidadServicios + ' servicio' + (stat.cantidadServicios > 1 ? 's' : '') + '</span>' +
+        '</div>' +
+        '<div class="space-y-2 mt-3 pt-3 border-t border-gray-200">' +
+          '<div class="flex justify-between text-sm">' +
+            '<span class="text-gray-600">Deuda Pendiente:</span>' +
+            '<span class="font-bold text-red-600">$' + stat.totalDeuda.toFixed(2) + '</span>' +
+          '</div>' +
+          '<div class="flex justify-between text-sm">' +
+            '<span class="text-gray-600">Pagado:</span>' +
+            '<span class="font-medium text-green-600">$' + stat.totalPagado.toFixed(2) + '</span>' +
+          '</div>' +
+          '<div class="flex justify-between text-sm pt-2 border-t border-gray-100">' +
+            '<span class="text-gray-600">Total:</span>' +
+            '<span class="font-medium text-gray-800">$' + stat.totalCosto.toFixed(2) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="mt-3 pt-3 border-t border-gray-200">' +
+          '<a href="/laboratorios/punto-venta" class="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center gap-1">' +
+            '<i class="fas fa-money-bill-wave"></i>' +
+            'Registrar Pago' +
+          '</a>' +
+        '</div>' +
+      '</div>';
+    }).join('')}
+  </div>
+</div>
+` : ''}
+<div class="mb-6">
+  <form action="/laboratorios" method="GET" class="flex gap-2">
+    <input type="text" name="search" value="${search}" placeholder="Buscar laboratorio..." 
+      class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 w-full md:w-64">
+    <button type="submit" class="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
+      <i class="fas fa-search"></i>
+    </button>
+  </form>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Nombre</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Contacto</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Teléfono</th>
+          <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        ` + (laboratorios.length > 0 ? laboratorios.map(function(l) {
+          return '<tr class="hover:bg-gray-50">' +
+            '<td class="px-6 py-4">' +
+              '<div class="flex items-center gap-3">' +
+                '<div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">' +
+                  '<i class="fas fa-flask"></i>' +
+                '</div>' +
+                '<div>' +
+                  '<p class="font-medium text-gray-800">' + l.nombre + '</p>' +
+                '</div>' +
+              '</div>' +
+            '</td>' +
+            '<td class="px-6 py-4 text-gray-600">' + (l.contacto || '-') + '</td>' +
+            '<td class="px-6 py-4 text-gray-600">' + (l.telefono || '-') + '</td>' +
+            '<td class="px-6 py-4 text-center">' +
+              '<a href="/laboratorios/' + l.id + '" class="text-primary-600 hover:text-primary-800 mx-1" title="Ver"><i class="fas fa-eye"></i></a>' +
+              '<a href="/laboratorios/' + l.id + '/editar" class="text-gray-600 hover:text-gray-800 mx-1" title="Editar"><i class="fas fa-edit"></i></a>' +
+              '<form action="/laboratorios/' + l.id + '/eliminar" method="POST" class="inline" onsubmit="return confirm(\'¿Estás seguro de eliminar este laboratorio?\')">' +
+                '<button type="submit" class="text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash"></i></button>' +
+              '</form>' +
+            '</td>' +
+          '</tr>';
+        }).join('') : '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">No se encontraron laboratorios</td></tr>') + `
+      </tbody>
+    </table>
+  </div>
+</div>
+`}) %>
+

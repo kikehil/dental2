@@ -1,0 +1,673 @@
+<%
+const formatCurrencyFn = typeof formatCurrency !== 'undefined' ? formatCurrency : function(v) { return '$' + parseFloat(v || 0).toFixed(2); };
+const doctoresList = typeof doctores !== 'undefined' ? doctores : [];
+const conceptosList = typeof conceptos !== 'undefined' ? conceptos : [];
+const doctoresConDeudaList = typeof doctoresConDeuda !== 'undefined' ? doctoresConDeuda : [];
+
+// Generar HTML de la tabla antes del template literal
+let tablaHtml = '';
+if (doctoresConDeudaList.length === 0) {
+  tablaHtml = '<tr><td colspan="5" class="px-6 py-8 text-center text-gray-500"><i class="fas fa-inbox text-4xl mb-2 block"></i>No hay préstamos pendientes registrados</td></tr>';
+} else {
+  tablaHtml = doctoresConDeudaList.map(function(item) {
+    return '<tr class="hover:bg-gray-50">' +
+      '<td class="px-6 py-4 whitespace-nowrap">' +
+        '<div class="text-sm font-medium text-gray-900">Dr. ' + item.doctor.nombre + ' ' + item.doctor.apellido + '</div>' +
+        '<div class="text-sm text-gray-500">' + (item.doctor.especialidad || '') + '</div>' +
+      '</td>' +
+      '<td class="px-6 py-4 whitespace-nowrap">' +
+        '<div class="text-sm font-bold text-gray-900">' + formatCurrencyFn(item.totalDeuda) + '</div>' +
+      '</td>' +
+      '<td class="px-6 py-4 whitespace-nowrap">' +
+        '<div class="text-sm font-bold text-yellow-600">' + formatCurrencyFn(item.totalPendiente) + '</div>' +
+      '</td>' +
+      '<td class="px-6 py-4 whitespace-nowrap">' +
+        '<div class="text-sm font-bold text-green-600">' + formatCurrencyFn(item.totalPagado) + '</div>' +
+      '</td>' +
+      '<td class="px-6 py-4 whitespace-nowrap text-center">' +
+        '<button onclick="verDetalle(' + item.doctor.id + ')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">' +
+          '<i class="fas fa-eye mr-1"></i>Ver Detalle' +
+        '</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// Generar HTML de opciones de doctores
+const doctoresOptionsHtml = doctoresList.map(function(d) {
+  return '<option value="' + d.id + '">Dr. ' + d.nombre + ' ' + d.apellido + '</option>';
+}).join('');
+
+// Generar HTML de opciones de conceptos
+const conceptosOptionsHtml = conceptosList.map(function(c) {
+  return '<option value="' + c.id + '">' + c.nombre + '</option>';
+}).join('');
+
+// Construir todo el body HTML como una variable
+const bodyHtml = '<div class="max-w-6xl mx-auto">' +
+  '<!-- Pestañas -->' +
+  '<div class="bg-white rounded-xl shadow-lg p-6 mb-6">' +
+    '<div class="border-b border-gray-200 mb-6">' +
+      '<nav class="flex space-x-8">' +
+        '<a href="/gastos" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">' +
+          'Gastos Generales' +
+        '</a>' +
+        '<a href="/gastos/laboratorio" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">' +
+          '<i class="fas fa-flask mr-2"></i>Pagos a Laboratorios' +
+        '</a>' +
+        '<a href="/gastos/prestamos" class="px-4 py-2 border-b-2 border-primary-500 text-primary-600 font-medium">' +
+          '<i class="fas fa-hand-holding-usd mr-2"></i>Préstamos al Personal' +
+        '</a>' +
+      '</nav>' +
+    '</div>' +
+  '</div>' +
+  '<div class="bg-white rounded-xl shadow-lg p-6">' +
+    '<div class="flex justify-between items-center mb-6">' +
+      '<h2 class="text-2xl font-bold text-gray-800">Préstamos al Personal</h2>' +
+      '<div class="flex gap-2">' +
+        '<button onclick="abrirModalNuevoPrestamo()" class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg">' +
+          '<i class="fas fa-plus mr-2"></i>Nuevo Préstamo' +
+        '</button>' +
+        '<button onclick="abrirModalConsulta()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">' +
+          '<i class="fas fa-search mr-2"></i>Consulta' +
+        '</button>' +
+        '<a href="/gastos/prestamos/conceptos" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">' +
+          '<i class="fas fa-cog mr-2"></i>Gestionar Conceptos' +
+        '</a>' +
+      '</div>' +
+    '</div>' +
+    '<!-- Listado de deudas activas -->' +
+    '<div class="overflow-x-auto">' +
+      '<table class="min-w-full divide-y divide-gray-200">' +
+        '<thead class="bg-gray-50">' +
+          '<tr>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Persona</th>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Deuda</th>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pendiente</th>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pagado</th>' +
+            '<th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody class="bg-white divide-y divide-gray-200">' +
+          tablaHtml +
+        '</tbody>' +
+      '</table>' +
+    '</div>' +
+  '</div>' +
+'</div>' +
+'<!-- Modal Nuevo Préstamo -->' +
+'<div id="modalNuevoPrestamo" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">' +
+  '<div class="relative p-6 border shadow-lg rounded-lg bg-white m-4 max-w-md w-full">' +
+    '<h3 class="text-lg font-bold text-gray-800 mb-4">Nuevo Préstamo</h3>' +
+    '<form id="formNuevoPrestamo" onsubmit="guardarPrestamo(event)">' +
+      '<div class="mb-4">' +
+        '<label class="block text-sm font-medium text-gray-700 mb-2">Doctor *</label>' +
+        '<select id="doctorPrestamo" name="doctorId" required class="w-full px-4 py-2 border rounded-lg">' +
+          '<option value="">Seleccione un doctor</option>' +
+          doctoresOptionsHtml +
+        '</select>' +
+      '</div>' +
+      '<div class="mb-4">' +
+        '<label class="block text-sm font-medium text-gray-700 mb-2">Concepto *</label>' +
+        '<select id="conceptoPrestamo" name="conceptoId" required class="w-full px-4 py-2 border rounded-lg">' +
+          '<option value="">Seleccione un concepto</option>' +
+          conceptosOptionsHtml +
+        '</select>' +
+      '</div>' +
+      '<div class="mb-4">' +
+        '<label class="block text-sm font-medium text-gray-700 mb-2">Fuente de Dinero *</label>' +
+        '<select id="fuenteDinero" name="fuenteDinero" required class="w-full px-4 py-2 border rounded-lg" onchange="actualizarSaldoDisponible()">' +
+          '<option value="">Seleccione una fuente</option>' +
+          '<option value="efectivo">EFECTIVO</option>' +
+          '<option value="azteca">Azteca</option>' +
+          '<option value="bbva">BBVA</option>' +
+          '<option value="mercadopago">Mercado Pago</option>' +
+        '</select>' +
+        '<div id="saldoDisponible" class="mt-2 text-sm text-gray-600"></div>' +
+      '</div>' +
+      '<div class="mb-4">' +
+        '<label class="block text-sm font-medium text-gray-700 mb-2">Monto *</label>' +
+        '<input type="number" id="montoPrestamo" name="monto" step="0.01" min="0.01" required class="w-full px-4 py-2 border rounded-lg" placeholder="0.00" onchange="validarMonto()">' +
+        '<div id="mensajeErrorMonto" class="mt-2 text-sm text-red-600 hidden"></div>' +
+      '</div>' +
+      '<div class="mb-4">' +
+        '<label class="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>' +
+        '<textarea id="notasPrestamo" name="notas" rows="3" class="w-full px-4 py-2 border rounded-lg" placeholder="Notas adicionales..."></textarea>' +
+      '</div>' +
+      '<div class="flex gap-2">' +
+        '<button type="submit" class="flex-1 bg-primary-500 hover:bg-primary-600 text-white py-2 px-4 rounded-lg">' +
+          '<i class="fas fa-save mr-2"></i>Guardar' +
+        '</button>' +
+        '<button type="button" onclick="cerrarModalNuevoPrestamo()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg">' +
+          'Cancelar' +
+        '</button>' +
+      '</div>' +
+    '</form>' +
+  '</div>' +
+'</div>' +
+'<!-- Modal Consulta -->' +
+'<div id="modalConsulta" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">' +
+  '<div class="relative p-6 border shadow-lg rounded-lg bg-white m-4 max-w-md w-full">' +
+    '<h3 class="text-lg font-bold text-gray-800 mb-4">Consulta de Préstamos</h3>' +
+    '<div class="mb-4">' +
+      '<label class="block text-sm font-medium text-gray-700 mb-2">Doctor</label>' +
+      '<select id="doctorConsulta" onchange="consultarPrestamosPorDoctor()" class="w-full px-4 py-2 border rounded-lg">' +
+        '<option value="">Seleccione un doctor</option>' +
+        doctoresOptionsHtml +
+      '</select>' +
+    '</div>' +
+    '<div id="resultadoConsulta" class="mt-4"></div>' +
+    '<div class="mt-4">' +
+      '<button onclick="cerrarModalConsulta()" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg">' +
+        'Cerrar' +
+      '</button>' +
+    '</div>' +
+  '</div>' +
+'</div>' +
+'<!-- Modal Detalle -->' +
+'<div id="modalDetalle" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">' +
+  '<div class="relative p-6 border shadow-lg rounded-lg bg-white m-4 max-w-5xl w-full max-h-[90vh] overflow-y-auto">' +
+    '<h3 class="text-lg font-bold text-gray-800 mb-4">Detalle de Préstamos</h3>' +
+    '<div id="contenidoDetalle"></div>' +
+    '<div class="mt-4">' +
+      '<button onclick="cerrarModalDetalle()" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg">' +
+        'Cerrar' +
+      '</button>' +
+    '</div>' +
+  '</div>' +
+'</div>' +
+'<!-- Modal Notificación -->' +
+'<div id="modalNotificacion" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">' +
+  '<div class="relative p-6 border shadow-lg rounded-lg bg-white m-4 max-w-md w-full">' +
+    '<div id="contenidoNotificacion"></div>' +
+    '<div class="mt-4">' +
+      '<button onclick="cerrarModalNotificacion()" class="w-full bg-primary-500 hover:bg-primary-600 text-white py-2 px-4 rounded-lg">' +
+        'Aceptar' +
+      '</button>' +
+    '</div>' +
+  '</div>' +
+'</div>' +
+'<!-- Modal Confirmación -->' +
+'<div id="modalConfirmacion" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center z-50" style="display: none;">' +
+  '<div class="relative p-6 border shadow-lg rounded-lg bg-white m-4 max-w-md w-full">' +
+    '<div class="text-center mb-4">' +
+      '<i class="fas fa-question-circle text-yellow-500 text-5xl mb-4"></i>' +
+      '<h4 class="text-lg font-bold text-gray-800 mb-2" id="tituloConfirmacion">Confirmar Acción</h4>' +
+      '<p class="text-gray-700" id="mensajeConfirmacion"></p>' +
+    '</div>' +
+    '<div class="flex gap-2">' +
+      '<button id="btnConfirmarAccion" class="flex-1 bg-primary-500 hover:bg-primary-600 text-white py-2 px-4 rounded-lg">' +
+        'Confirmar' +
+      '</button>' +
+      '<button onclick="cerrarModalConfirmacion()" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white py-2 px-4 rounded-lg">' +
+        'Cancelar' +
+      '</button>' +
+    '</div>' +
+  '</div>' +
+'</div>';
+%>
+<%- include('../layout', { body: bodyHtml }) %>
+
+<script>
+// Variables globales para saldos
+let saldosDisponibles = {
+  efectivo: 0,
+  azteca: 0,
+  bbva: 0,
+  mercadopago: 0
+};
+
+// Cargar saldos disponibles al abrir el modal
+async function cargarSaldosDisponibles() {
+  try {
+    const response = await fetch('/gastos/prestamos/saldos');
+    const result = await response.json();
+    if (result.success) {
+      saldosDisponibles = result.saldos;
+      actualizarSaldoDisponible();
+    }
+  } catch (error) {
+    console.error('Error al cargar saldos:', error);
+  }
+}
+
+// Actualizar saldo disponible mostrado
+function actualizarSaldoDisponible() {
+  const fuente = document.getElementById('fuenteDinero').value;
+  const saldoDiv = document.getElementById('saldoDisponible');
+  
+  if (!fuente) {
+    saldoDiv.innerHTML = '';
+    return;
+  }
+  
+  let saldo = 0;
+  let nombreFuente = '';
+  
+  if (fuente === 'efectivo') {
+    saldo = saldosDisponibles.efectivo;
+    nombreFuente = 'EFECTIVO';
+  } else if (fuente === 'azteca') {
+    saldo = saldosDisponibles.azteca;
+    nombreFuente = 'Azteca';
+  } else if (fuente === 'bbva') {
+    saldo = saldosDisponibles.bbva;
+    nombreFuente = 'BBVA';
+  } else if (fuente === 'mercadopago') {
+    saldo = saldosDisponibles.mercadopago;
+    nombreFuente = 'Mercado Pago';
+  }
+  
+  saldoDiv.innerHTML = '<span class="font-semibold">Saldo disponible en ' + nombreFuente + ':</span> <span class="text-green-600 font-bold">' + formatCurrency(saldo) + '</span>';
+  
+  // Validar monto si ya hay uno ingresado
+  validarMonto();
+}
+
+// Validar que el monto no exceda el saldo disponible
+function validarMonto() {
+  const fuente = document.getElementById('fuenteDinero').value;
+  const monto = parseFloat(document.getElementById('montoPrestamo').value) || 0;
+  const errorDiv = document.getElementById('mensajeErrorMonto');
+  
+  if (!fuente || monto === 0) {
+    errorDiv.classList.add('hidden');
+    return true;
+  }
+  
+  let saldo = 0;
+  let nombreFuente = '';
+  
+  if (fuente === 'efectivo') {
+    saldo = saldosDisponibles.efectivo;
+    nombreFuente = 'EFECTIVO';
+  } else if (fuente === 'azteca') {
+    saldo = saldosDisponibles.azteca;
+    nombreFuente = 'Azteca';
+  } else if (fuente === 'bbva') {
+    saldo = saldosDisponibles.bbva;
+    nombreFuente = 'BBVA';
+  } else if (fuente === 'mercadopago') {
+    saldo = saldosDisponibles.mercadopago;
+    nombreFuente = 'Mercado Pago';
+  }
+  
+  if (monto > saldo) {
+    errorDiv.textContent = 'El monto (' + formatCurrency(monto) + ') excede el saldo disponible (' + formatCurrency(saldo) + ') en ' + nombreFuente;
+    errorDiv.classList.remove('hidden');
+    return false;
+  } else {
+    errorDiv.classList.add('hidden');
+    return true;
+  }
+}
+
+// Funciones de modales
+function abrirModalNuevoPrestamo() {
+  document.getElementById('modalNuevoPrestamo').style.display = 'flex';
+  document.getElementById('formNuevoPrestamo').reset();
+  document.getElementById('saldoDisponible').innerHTML = '';
+  document.getElementById('mensajeErrorMonto').classList.add('hidden');
+  cargarSaldosDisponibles();
+}
+
+function cerrarModalNuevoPrestamo() {
+  document.getElementById('modalNuevoPrestamo').style.display = 'none';
+}
+
+function abrirModalConsulta() {
+  document.getElementById('modalConsulta').style.display = 'flex';
+  document.getElementById('doctorConsulta').value = '';
+  document.getElementById('resultadoConsulta').innerHTML = '';
+}
+
+function cerrarModalConsulta() {
+  document.getElementById('modalConsulta').style.display = 'none';
+}
+
+function cerrarModalDetalle() {
+  document.getElementById('modalDetalle').style.display = 'none';
+}
+
+function mostrarNotificacion(titulo, mensaje, tipo) {
+  tipo = tipo || 'info';
+  const tipos = {
+    success: { icon: 'fa-check-circle', color: 'text-green-600', bg: 'bg-green-100' },
+    error: { icon: 'fa-exclamation-circle', color: 'text-red-600', bg: 'bg-red-100' },
+    warning: { icon: 'fa-exclamation-triangle', color: 'text-yellow-600', bg: 'bg-yellow-100' },
+    info: { icon: 'fa-info-circle', color: 'text-blue-600', bg: 'bg-blue-100' }
+  };
+  const config = tipos[tipo] || tipos.info;
+  document.getElementById('contenidoNotificacion').innerHTML = 
+    '<div class="' + config.bg + ' rounded-lg p-4 mb-4">' +
+      '<i class="fas ' + config.icon + ' ' + config.color + ' text-2xl mb-2"></i>' +
+      '<h4 class="font-bold text-gray-800 mb-2">' + titulo + '</h4>' +
+      '<p class="text-gray-700">' + mensaje + '</p>' +
+    '</div>';
+  document.getElementById('modalNotificacion').style.display = 'flex';
+}
+
+function cerrarModalNotificacion() {
+  document.getElementById('modalNotificacion').style.display = 'none';
+}
+
+// Funciones para modal de confirmación
+let confirmacionCallback = null;
+
+function mostrarConfirmacion(titulo, mensaje, callback) {
+  document.getElementById('tituloConfirmacion').textContent = titulo;
+  document.getElementById('mensajeConfirmacion').textContent = mensaje;
+  confirmacionCallback = callback;
+  document.getElementById('modalConfirmacion').style.display = 'flex';
+}
+
+function cerrarModalConfirmacion() {
+  document.getElementById('modalConfirmacion').style.display = 'none';
+  confirmacionCallback = null;
+}
+
+// Event listener para botón de confirmar (usando delegación de eventos)
+document.addEventListener('click', function(e) {
+  if (e.target.id === 'btnConfirmarAccion') {
+    if (confirmacionCallback) {
+      confirmacionCallback();
+      cerrarModalConfirmacion();
+    }
+  }
+});
+
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN'
+  }).format(amount);
+}
+
+// Guardar préstamo
+async function guardarPrestamo(event) {
+  event.preventDefault();
+  
+  const formData = new FormData(event.target);
+  const fuenteDinero = formData.get('fuenteDinero');
+  
+  // Validar que se haya seleccionado una fuente de dinero
+  if (!fuenteDinero || fuenteDinero === '') {
+    mostrarNotificacion('Error', 'Por favor, seleccione una fuente de dinero', 'error');
+    return;
+  }
+  
+  // Validar monto antes de enviar
+  if (!validarMonto()) {
+    mostrarNotificacion('Error', 'El monto excede el saldo disponible. Por favor, verifique el monto y la fuente seleccionada.', 'error');
+    return;
+  }
+  
+  // Determinar metodoPago y banco según la fuente seleccionada
+  let metodoPago = 'efectivo';
+  let banco = null;
+  
+  if (fuenteDinero === 'efectivo') {
+    metodoPago = 'efectivo';
+    banco = null;
+  } else if (fuenteDinero === 'azteca' || fuenteDinero === 'bbva' || fuenteDinero === 'mercadopago') {
+    metodoPago = 'transferencia';
+    if (fuenteDinero === 'azteca') banco = 'Azteca';
+    else if (fuenteDinero === 'bbva') banco = 'BBVA';
+    else if (fuenteDinero === 'mercadopago') banco = 'Mercado Pago';
+  }
+  
+  const data = {
+    doctorId: formData.get('doctorId'),
+    conceptoId: formData.get('conceptoId'),
+    monto: formData.get('monto'),
+    notas: formData.get('notas'),
+    metodoPago: metodoPago,
+    banco: banco
+  };
+
+  try {
+    const response = await fetch('/gastos/prestamos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      mostrarNotificacion('Éxito', 'Préstamo registrado exitosamente', 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      const mensajeError = result.error || result.message || 'Error al registrar préstamo';
+      const detallesError = result.details ? ' (' + result.details + ')' : '';
+      mostrarNotificacion('Error', mensajeError + detallesError, 'error');
+    }
+  } catch (error) {
+    console.error('Error al registrar préstamo:', error);
+    mostrarNotificacion('Error', 'Error al registrar préstamo: ' + error.message, 'error');
+  }
+}
+
+// Ver detalle
+async function verDetalle(doctorId) {
+  try {
+    const response = await fetch('/gastos/prestamos/detalle/' + doctorId);
+    const result = await response.json();
+    
+    if (result.success) {
+      const { doctor, prestamos, totales } = result;
+      
+      // Si no hay préstamos, mostrar mensaje amigable
+      if (!prestamos || prestamos.length === 0) {
+        let html = 
+          '<div class="mb-4">' +
+            '<h4 class="text-lg font-bold text-gray-800">Dr. ' + doctor.nombre + ' ' + doctor.apellido + '</h4>' +
+          '</div>' +
+          '<div class="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">' +
+            '<i class="fas fa-info-circle text-blue-500 text-5xl mb-4"></i>' +
+            '<p class="text-gray-700 text-lg font-medium">Sin historial de préstamos</p>' +
+          '</div>';
+        document.getElementById('contenidoDetalle').innerHTML = html;
+        document.getElementById('modalDetalle').style.display = 'flex';
+        return;
+      }
+      
+      let html = 
+        '<div class="mb-4">' +
+          '<h4 class="text-lg font-bold text-gray-800">Dr. ' + doctor.nombre + ' ' + doctor.apellido + '</h4>' +
+          '<div class="grid grid-cols-3 gap-4 mt-4">' +
+            '<div class="bg-gray-50 p-3 rounded">' +
+              '<p class="text-sm text-gray-600">Total Deuda</p>' +
+              '<p class="text-xl font-bold text-gray-800">' + formatCurrency(totales.totalDeuda) + '</p>' +
+            '</div>' +
+            '<div class="bg-yellow-50 p-3 rounded">' +
+              '<p class="text-sm text-gray-600">Pendiente</p>' +
+              '<p class="text-xl font-bold text-yellow-600">' + formatCurrency(totales.totalPendiente) + '</p>' +
+            '</div>' +
+            '<div class="bg-green-50 p-3 rounded">' +
+              '<p class="text-sm text-gray-600">Pagado</p>' +
+              '<p class="text-xl font-bold text-green-600">' + formatCurrency(totales.totalPagado) + '</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="overflow-x-auto">' +
+          '<table class="min-w-full divide-y divide-gray-200">' +
+            '<thead class="bg-gray-50">' +
+              '<tr>' +
+                '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Concepto</th>' +
+                '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Monto</th>' +
+                '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Fecha</th>' +
+                '<th class="px-4 py-2 text-left text-xs font-medium text-gray-500">Estatus</th>' +
+                '<th class="px-4 py-2 text-center text-xs font-medium text-gray-500">Acciones</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody class="bg-white divide-y divide-gray-200">';
+      
+      prestamos.forEach(p => {
+        const fecha = new Date(p.createdAt).toLocaleDateString('es-MX');
+        const estatusClass = p.estatus === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800';
+        const nuevoEstatus = p.estatus === 'pendiente' ? 'pagado' : 'pendiente';
+        const textoBoton = p.estatus === 'pendiente' ? 'Pagado' : 'Pendiente';
+        html += 
+          '<tr>' +
+            '<td class="px-4 py-2 text-sm text-gray-900">' + p.concepto.nombre + '</td>' +
+            '<td class="px-4 py-2 text-sm font-bold text-gray-900">' + formatCurrency(p.monto) + '</td>' +
+            '<td class="px-4 py-2 text-sm text-gray-600">' + fecha + '</td>' +
+            '<td class="px-4 py-2">' +
+              '<span class="px-2 py-1 rounded-full text-xs ' + estatusClass + '">' + (p.estatus === 'pendiente' ? 'Pendiente' : 'Pagado') + '</span>' +
+            '</td>' +
+            '<td class="px-4 py-2 text-center">' +
+              '<button class="btn-cambiar-estatus bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm" ' +
+                      'data-prestamo-id="' + p.id + '" data-nuevo-estatus="' + nuevoEstatus + '">' +
+                'Marcar como ' + textoBoton +
+              '</button>' +
+            '</td>' +
+          '</tr>';
+      });
+      
+      html += 
+            '</tbody>' +
+          '</table>' +
+        '</div>';
+      
+      document.getElementById('contenidoDetalle').innerHTML = html;
+      document.getElementById('modalDetalle').style.display = 'flex';
+    } else {
+      mostrarNotificacion('Error', result.error || 'Error al obtener detalle', 'error');
+    }
+  } catch (error) {
+    mostrarNotificacion('Error', 'Error al obtener detalle', 'error');
+  }
+}
+
+// Cambiar estatus
+async function cambiarEstatus(prestamoId, nuevoEstatus) {
+  const textoEstatus = nuevoEstatus === 'pagado' ? 'Pagado' : 'Pendiente';
+  mostrarConfirmacion(
+    'Confirmar Cambio de Estatus',
+    '¿Está seguro de cambiar el estatus a "' + textoEstatus + '"?',
+    async function() {
+      try {
+        const response = await fetch('/gastos/prestamos/' + prestamoId + '/estatus', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ estatus: nuevoEstatus })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          mostrarNotificacion('Éxito', 'Estatus actualizado exitosamente', 'success');
+          setTimeout(() => {
+            window.location.reload();
+          }, 1500);
+        } else {
+          mostrarNotificacion('Error', result.error || 'Error al actualizar estatus', 'error');
+        }
+      } catch (error) {
+        mostrarNotificacion('Error', 'Error al actualizar estatus', 'error');
+      }
+    }
+  );
+}
+
+// Consultar préstamos por doctor
+async function consultarPrestamosPorDoctor() {
+  const doctorId = document.getElementById('doctorConsulta').value;
+  if (!doctorId) {
+    document.getElementById('resultadoConsulta').innerHTML = '';
+    return;
+  }
+
+  try {
+    const response = await fetch('/gastos/prestamos/detalle/' + doctorId);
+    const result = await response.json();
+    
+    if (result.success) {
+      const { doctor, prestamos, totales } = result;
+      
+      // Si no hay préstamos, mostrar mensaje amigable
+      if (!prestamos || prestamos.length === 0) {
+        document.getElementById('resultadoConsulta').innerHTML = 
+          '<div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">' +
+            '<i class="fas fa-info-circle text-blue-500 text-4xl mb-3"></i>' +
+            '<h4 class="font-bold text-gray-800 mb-2">Dr. ' + doctor.nombre + ' ' + doctor.apellido + '</h4>' +
+            '<p class="text-gray-600">Sin historial de préstamos</p>' +
+          '</div>';
+        return;
+      }
+      
+      let html = 
+        '<div class="bg-gray-50 p-4 rounded mb-4">' +
+          '<h4 class="font-bold text-gray-800 mb-2">Dr. ' + doctor.nombre + ' ' + doctor.apellido + '</h4>' +
+          '<div class="grid grid-cols-3 gap-2 text-sm">' +
+            '<div>' +
+              '<p class="text-gray-600">Total Deuda</p>' +
+              '<p class="font-bold text-gray-800">' + formatCurrency(totales.totalDeuda) + '</p>' +
+            '</div>' +
+            '<div>' +
+              '<p class="text-gray-600">Pendiente</p>' +
+              '<p class="font-bold text-yellow-600">' + formatCurrency(totales.totalPendiente) + '</p>' +
+            '</div>' +
+            '<div>' +
+              '<p class="text-gray-600">Pagado</p>' +
+              '<p class="font-bold text-green-600">' + formatCurrency(totales.totalPagado) + '</p>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="max-h-64 overflow-y-auto">' +
+          '<table class="min-w-full text-sm">' +
+            '<thead class="bg-gray-100 sticky top-0">' +
+              '<tr>' +
+                '<th class="px-2 py-1 text-left">Concepto</th>' +
+                '<th class="px-2 py-1 text-left">Monto</th>' +
+                '<th class="px-2 py-1 text-left">Estatus</th>' +
+              '</tr>' +
+            '</thead>' +
+            '<tbody>';
+      
+      prestamos.forEach(p => {
+        const estatusClass = p.estatus === 'pendiente' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800';
+        html += 
+          '<tr class="border-b">' +
+            '<td class="px-2 py-1">' + p.concepto.nombre + '</td>' +
+            '<td class="px-2 py-1 font-bold">' + formatCurrency(p.monto) + '</td>' +
+            '<td class="px-2 py-1">' +
+              '<span class="px-2 py-1 rounded text-xs ' + estatusClass + '">' + (p.estatus === 'pendiente' ? 'Pendiente' : 'Pagado') + '</span>' +
+            '</td>' +
+          '</tr>';
+      });
+      
+      html += 
+            '</tbody>' +
+          '</table>' +
+        '</div>';
+      
+      document.getElementById('resultadoConsulta').innerHTML = html;
+    } else {
+      document.getElementById('resultadoConsulta').innerHTML = '<p class="text-red-600">Error al obtener datos</p>';
+    }
+  } catch (error) {
+    console.error('Error al consultar:', error);
+    document.getElementById('resultadoConsulta').innerHTML = '<p class="text-red-600">Error al consultar</p>';
+  }
+}
+
+// Event listener para botones de cambiar estatus (usando delegación de eventos)
+document.addEventListener('click', function(e) {
+  // Botones de cambiar estatus
+  if (e.target.classList.contains('btn-cambiar-estatus')) {
+    const prestamoId = parseInt(e.target.getAttribute('data-prestamo-id'));
+    const nuevoEstatus = e.target.getAttribute('data-nuevo-estatus');
+    cambiarEstatus(prestamoId, nuevoEstatus);
+    return;
+  }
+  
+  // Cerrar modales al hacer clic fuera
+  if (e.target.id === 'modalNuevoPrestamo') cerrarModalNuevoPrestamo();
+  if (e.target.id === 'modalConsulta') cerrarModalConsulta();
+  if (e.target.id === 'modalDetalle') cerrarModalDetalle();
+  if (e.target.id === 'modalNotificacion') cerrarModalNotificacion();
+  if (e.target.id === 'modalConfirmacion') cerrarModalConfirmacion();
+});
+</script>

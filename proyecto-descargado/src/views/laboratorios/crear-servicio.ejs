@@ -1,0 +1,154 @@
+<%- include('../layout', { body: `
+<div class="max-w-4xl mx-auto">
+  <div class="bg-white rounded-xl shadow-sm p-6">
+    ${error ? '<div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6"><i class="fas fa-exclamation-circle mr-2"></i>' + error + '</div>' : ''}
+
+    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+      <i class="fas fa-plus-circle text-primary-500"></i> Nuevo Servicio de Laboratorio
+    </h2>
+
+    <form action="/laboratorios/crear-servicio" method="POST" class="space-y-6">
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Laboratorio -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Laboratorio <span class="text-red-500">*</span>
+          </label>
+          <select name="laboratorioId" required
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+            <option value="">Seleccionar laboratorio</option>
+            ${laboratorios.map(function(l) {
+              return '<option value="' + l.id + '">' + l.nombre + '</option>';
+            }).join('')}
+          </select>
+        </div>
+
+        <!-- Servicio/Tratamiento -->
+        <div style="position: relative;">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Tratamiento (Servicio) <span class="text-red-500">*</span>
+          </label>
+          <input type="hidden" id="servicioId" name="servicioId" required>
+          <input type="text" id="servicioId_search" 
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Buscar tratamiento..." autocomplete="off">
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Doctor -->
+        <div style="position: relative;">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Doctor <span class="text-red-500">*</span>
+          </label>
+          <input type="hidden" id="doctorId" name="doctorId" required>
+          <input type="text" id="doctorId_search" 
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Buscar doctor por nombre o apellido..." autocomplete="off">
+        </div>
+
+        <!-- Paciente -->
+        <div style="position: relative;">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Paciente <span class="text-red-500">*</span>
+          </label>
+          <input type="hidden" id="pacienteId" name="pacienteId" required>
+          <input type="text" id="pacienteId_search" 
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Buscar paciente por nombre o apellido..." autocomplete="off">
+        </div>
+      </div>
+
+      <!-- Costo del Servicio -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Costo del Servicio <span class="text-red-500">*</span>
+        </label>
+        <input type="number" name="costo" step="0.01" min="0.01" required
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+          placeholder="0.00">
+      </div>
+
+      <div class="flex gap-4 pt-4 border-t border-gray-200">
+        <a href="/laboratorios/punto-venta" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+          Cancelar
+        </a>
+        <button type="submit" class="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition flex items-center gap-2">
+          <i class="fas fa-save"></i>
+          Guardar Servicio
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+`}) %>
+
+<script>
+// Inicializar componentes de búsqueda con datos del servidor
+(function() {
+  const pacientesData = <%- pacientesDataJsonStr %>;
+  const doctoresData = <%- doctoresDataJsonStr %>;
+  const serviciosData = <%- serviciosDataJsonStr %>;
+  
+  function inicializarComponentesBusqueda() {
+    if (typeof window.createSearchableSelect === 'undefined') {
+      setTimeout(inicializarComponentesBusqueda, 100);
+      return;
+    }
+
+    console.log('Inicializando componentes de búsqueda...');
+    console.log('Pacientes:', pacientesData ? pacientesData.length : 0);
+    console.log('Doctores:', doctoresData ? doctoresData.length : 0);
+    console.log('Servicios:', serviciosData ? serviciosData.length : 0);
+
+    // Componente de búsqueda para Paciente
+    const pacienteInput = document.getElementById('pacienteId_search');
+    if (pacienteInput) {
+      window.createSearchableSelect({
+        inputId: 'pacienteId_search',
+        hiddenInputId: 'pacienteId',
+        options: pacientesData || [],
+        placeholder: 'Buscar paciente por nombre o apellido...',
+        emptyText: 'No se encontraron pacientes',
+        required: true
+      });
+      console.log('Componente de paciente inicializado');
+    }
+
+    // Componente de búsqueda para Doctor
+    const doctorInput = document.getElementById('doctorId_search');
+    if (doctorInput) {
+      window.createSearchableSelect({
+        inputId: 'doctorId_search',
+        hiddenInputId: 'doctorId',
+        options: doctoresData || [],
+        placeholder: 'Buscar doctor por nombre o apellido...',
+        emptyText: 'No se encontraron doctores',
+        required: true
+      });
+      console.log('Componente de doctor inicializado');
+    }
+
+    // Componente de búsqueda para Servicio
+    const servicioInput = document.getElementById('servicioId_search');
+    if (servicioInput) {
+      window.createSearchableSelect({
+        inputId: 'servicioId_search',
+        hiddenInputId: 'servicioId',
+        options: serviciosData || [],
+        placeholder: 'Buscar tratamiento...',
+        emptyText: 'No se encontraron tratamientos',
+        required: true
+      });
+      console.log('Componente de servicio inicializado');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarComponentesBusqueda);
+  } else {
+    inicializarComponentesBusqueda();
+  }
+})();
+</script>
+

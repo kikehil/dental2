@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> | Clínica Dental</title>
+  <link rel="stylesheet" href="/css/output.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <% if (typeof currentPath !== 'undefined' && currentPath && currentPath.startsWith('/configuracion/productos')) { %>
+  <script>
+  // Stubs para funciones de almacén - disponibles antes del header
+  window.mostrarTab = function(tab) {
+    if (window._mostrarTabImpl) return window._mostrarTabImpl(tab);
+    // fallback simple
+    const contenidoProductos = document.getElementById('contenidoProductos');
+    const contenidoMateriales = document.getElementById('contenidoMateriales');
+    const contenidoUsoMateriales = document.getElementById('contenidoUsoMateriales');
+    if (contenidoProductos) contenidoProductos.classList.add('hidden');
+    if (contenidoMateriales) contenidoMateriales.classList.add('hidden');
+    if (contenidoUsoMateriales) contenidoUsoMateriales.classList.add('hidden');
+    if (tab === 'productos' && contenidoProductos) contenidoProductos.classList.remove('hidden');
+    if (tab === 'materiales' && contenidoMateriales) contenidoMateriales.classList.remove('hidden');
+    if (tab === 'uso-materiales' && contenidoUsoMateriales) contenidoUsoMateriales.classList.remove('hidden');
+    const tabProductos = document.getElementById('tabProductos');
+    const tabMateriales = document.getElementById('tabMateriales');
+    const tabUsoMateriales = document.getElementById('tabUsoMateriales');
+    [tabProductos, tabMateriales, tabUsoMateriales].forEach(t => {
+      if (t) {
+        t.classList.remove('text-primary-600', 'border-b-2', 'border-primary-600');
+        t.classList.add('text-gray-500');
+      }
+    });
+    if (tab === 'productos' && tabProductos) {
+      tabProductos.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
+      tabProductos.classList.remove('text-gray-500');
+    } else if (tab === 'materiales' && tabMateriales) {
+      tabMateriales.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
+      tabMateriales.classList.remove('text-gray-500');
+    } else if (tab === 'uso-materiales' && tabUsoMateriales) {
+      tabUsoMateriales.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
+      tabUsoMateriales.classList.remove('text-gray-500');
+    }
+  };
+  window.abrirModalProducto = function() {
+    if (window._abrirModalProductoImpl) return window._abrirModalProductoImpl();
+    const modal = document.getElementById('modalProducto');
+    if (modal) modal.classList.remove('hidden');
+  };
+  window.abrirModalMaterial = function() {
+    if (window._abrirModalMaterialImpl) return window._abrirModalMaterialImpl();
+    const modal = document.getElementById('modalMaterial');
+    if (modal) modal.classList.remove('hidden');
+  };
+  window.abrirModalRegistro = function() {
+    if (window._abrirModalRegistroImpl) return window._abrirModalRegistroImpl();
+    const modal = document.getElementById('modalRegistroUso');
+    if (modal) modal.classList.remove('hidden');
+  };
+  </script>
+  <% } %>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div class="flex">
+    <%- include('partials/sidebar') %>
+    
+    <div class="flex-1 ml-64">
+      <%- include('partials/header') %>
+      
+      <main class="px-6 pb-6 pt-4">
+        <%- body %>
+      </main>
+    </div>
+  </div>
+
+  <script src="/js/main.js"></script>
+  <script>
+    // Funciones para saldos en tiempo real - Hacerlas globales
+    window.intervaloActualizacionSaldos = null;
+    
+    window.formatearMoneda = function(monto) {
+      return '$' + parseFloat(monto || 0).toFixed(2);
+    };
+    
+    window.actualizarSaldos = function() {
+      const currentPath = window.location.pathname;
+      if (!currentPath.startsWith('/pos')) {
+        return;
+      }
+      
+      fetch('/pos/saldos')
+        .then(function(response) { 
+          if (!response.ok) {
+            throw new Error('Error en la respuesta: ' + response.status);
+          }
+          return response.json(); 
+        })
+        .then(function(result) {
+          console.log('Respuesta de saldos:', result);
+          if (result.success && result.saldos) {
+            const saldos = result.saldos;
+            const saldoEfectivo = document.getElementById('saldoEfectivo');
+            const saldoBbva = document.getElementById('saldoBbva');
+            const saldoAzteca = document.getElementById('saldoAzteca');
+            const saldoMercadoPago = document.getElementById('saldoMercadoPago');
+            
+            console.log('Actualizando saldos en DOM:', saldos);
+            
+            if (saldoEfectivo) {
+              saldoEfectivo.textContent = window.formatearMoneda(saldos.efectivo);
+              console.log('Saldo efectivo actualizado:', saldos.efectivo);
+            } else {
+              console.warn('Elemento saldoEfectivo no encontrado');
+            }
+            if (saldoBbva) {
+              saldoBbva.textContent = window.formatearMoneda(saldos.bbva);
+              console.log('Saldo BBVA actualizado:', saldos.bbva);
+            } else {
+              console.warn('Elemento saldoBbva no encontrado');
+            }
+            if (saldoAzteca) {
+              saldoAzteca.textContent = window.formatearMoneda(saldos.azteca);
+              console.log('Saldo Azteca actualizado:', saldos.azteca);
+            } else {
+              console.warn('Elemento saldoAzteca no encontrado');
+            }
+            if (saldoMercadoPago) {
+              saldoMercadoPago.textContent = window.formatearMoneda(saldos.mercadoPago);
+              console.log('Saldo Mercado Pago actualizado:', saldos.mercadoPago);
+            } else {
+              console.warn('Elemento saldoMercadoPago no encontrado');
+            }
+          } else {
+            console.error('Error en respuesta de saldos:', result);
+          }
+        })
+        .catch(function(error) {
+          console.error('Error al actualizar saldos:', error);
+        });
+    };
+    
+    // Cargar saldos al inicio y actualizar cada 5 segundos si estamos en POS
+    document.addEventListener('DOMContentLoaded', function() {
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith('/pos')) {
+        // Esperar un poco para asegurar que el DOM esté completamente cargado
+        setTimeout(function() {
+          if (window.actualizarSaldos) {
+            window.actualizarSaldos();
+            // Actualizar cada 5 segundos
+            window.intervaloActualizacionSaldos = setInterval(window.actualizarSaldos, 5000);
+          }
+        }, 500);
+      }
+    });
+    
+    // Limpiar intervalo al salir de POS
+    window.addEventListener('beforeunload', function() {
+      if (window.intervaloActualizacionSaldos) {
+        clearInterval(window.intervaloActualizacionSaldos);
+      }
+    });
+    
+    // Funciones globales para corte de caja
+    function abrirModalCorteManual() {
+      var modal = document.createElement('div');
+      modal.id = 'modalCorteManual';
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = 
+        '<div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">' +
+          '<div class="p-6 border-b">' +
+            '<h3 class="text-2xl font-bold text-gray-800 flex items-center gap-3">' +
+              '<i class="fas fa-cut text-primary-500"></i>' +
+              'Tipo de Corte' +
+            '</h3>' +
+            '<p class="text-gray-600 mt-2">Selecciona el tipo de corte que deseas realizar</p>' +
+          '</div>' +
+          '<div class="p-6">' +
+            '<div class="space-y-3">' +
+              '<button onclick="seleccionarTipoCorte(\'efectivo\')" ' +
+                      'class="w-full bg-green-50 hover:bg-green-100 border-2 border-green-200 hover:border-green-400 text-green-700 py-4 px-6 rounded-lg transition flex items-center justify-between font-medium">' +
+                '<div class="flex items-center gap-3">' +
+                  '<i class="fas fa-money-bill-wave text-2xl"></i>' +
+                  '<div class="text-left">' +
+                    '<p class="font-bold text-lg">Efectivo</p>' +
+                    '<p class="text-sm text-gray-600">Corte solo de efectivo</p>' +
+                  '</div>' +
+                '</div>' +
+                '<i class="fas fa-chevron-right"></i>' +
+              '</button>' +
+              '<button onclick="seleccionarTipoCorte(\'bancos\')" ' +
+                      'class="w-full bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 hover:border-blue-400 text-blue-700 py-4 px-6 rounded-lg transition flex items-center justify-between font-medium">' +
+                '<div class="flex items-center gap-3">' +
+                  '<i class="fas fa-university text-2xl"></i>' +
+                  '<div class="text-left">' +
+                    '<p class="font-bold text-lg">Bancos</p>' +
+                    '<p class="text-sm text-gray-600">Corte de tarjetas y transferencias</p>' +
+                  '</div>' +
+                '</div>' +
+                '<i class="fas fa-chevron-right"></i>' +
+              '</button>' +
+            '</div>' +
+            '<div class="mt-6">' +
+              '<button type="button" onclick="cerrarModalCorteManual()" ' +
+                      'class="w-full bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition font-medium">' +
+                'Cancelar' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      
+      document.body.appendChild(modal);
+      
+      // Cerrar al hacer clic fuera
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) cerrarModalCorteManual();
+      });
+    }
+
+    function seleccionarTipoCorte(tipo) {
+      cerrarModalCorteManual();
+      // Abrir modal de verificación de contraseña
+      abrirModalVerificacionAdmin(tipo);
+    }
+
+    function abrirModalVerificacionAdmin(tipoCorte) {
+      var modal = document.createElement('div');
+      modal.id = 'modalVerificacionAdmin';
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = 
+        '<div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4">' +
+          '<div class="p-6 border-b">' +
+            '<h3 class="text-2xl font-bold text-gray-800 flex items-center gap-3">' +
+              '<i class="fas fa-shield-alt text-red-500"></i>' +
+              'Verificación Requerida' +
+            '</h3>' +
+            '<p class="text-gray-600 mt-2">Ingresa la contraseña del administrador para realizar el corte de ' + (tipoCorte === 'efectivo' ? 'efectivo' : 'bancos') + '</p>' +
+          '</div>' +
+          '<div class="p-6">' +
+            '<form id="formVerificarAdmin" onsubmit="verificarAdmin(event, \'' + tipoCorte + '\')">' +
+              '<div class="mb-4">' +
+                '<label class="block text-sm font-medium text-gray-700 mb-2">Contraseña de Administrador</label>' +
+                '<input type="password" id="passwordAdmin" required ' +
+                       'class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" ' +
+                       'placeholder="Ingresa la contraseña" autofocus>' +
+                '<p id="errorPassword" class="text-red-500 text-sm mt-1 hidden"></p>' +
+              '</div>' +
+              '<div class="flex gap-4">' +
+                '<button type="button" onclick="cerrarModalVerificacionAdmin()" ' +
+                        'class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition font-medium">' +
+                  'Cancelar' +
+                '</button>' +
+                '<button type="submit" ' +
+                        'class="flex-1 bg-primary-600 text-white py-3 rounded-lg hover:bg-primary-700 transition font-medium">' +
+                  '<i class="fas fa-check mr-2"></i> Verificar' +
+                '</button>' +
+              '</div>' +
+            '</form>' +
+          '</div>' +
+        '</div>';
+      
+      document.body.appendChild(modal);
+      
+      // Cerrar al hacer clic fuera
+      modal.addEventListener('click', function(e) {
+        if (e.target === modal) cerrarModalVerificacionAdmin();
+      });
+    }
+
+    function cerrarModalVerificacionAdmin() {
+      var modal = document.getElementById('modalVerificacionAdmin');
+      if (modal) modal.remove();
+    }
+
+    function cerrarModalCorteManual() {
+      var modal = document.getElementById('modalCorteManual');
+      if (modal) modal.remove();
+    }
+
+    function verificarAdmin(event, tipoCorte) {
+      event.preventDefault();
+      const password = document.getElementById('passwordAdmin').value;
+      const errorElement = document.getElementById('errorPassword');
+      
+      if (!password) {
+        errorElement.textContent = 'Ingresa la contraseña';
+        errorElement.classList.remove('hidden');
+        return;
+      }
+
+      // Deshabilitar botón mientras se verifica
+      const submitBtn = event.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Verificando...';
+
+      fetch('/pos/verificar-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: password })
+      })
+      .then(function(response) { return response.json(); })
+      .then(function(result) {
+        if (result.success) {
+          cerrarModalVerificacionAdmin();
+          // Redirigir según el tipo de corte
+          if (tipoCorte === 'efectivo') {
+            window.location.href = '/pos/corte-efectivo';
+          } else if (tipoCorte === 'bancos') {
+            window.location.href = '/pos/corte-bancos';
+          }
+        } else {
+          errorElement.textContent = result.error || 'Contraseña incorrecta';
+          errorElement.classList.remove('hidden');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Verificar';
+        }
+      })
+      .catch(function(error) {
+        errorElement.textContent = 'Error al verificar contraseña';
+        errorElement.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-check mr-2"></i> Verificar';
+      });
+    }
+
+    // Abrir modal de retiro manual
+    function abrirModalRetiroManual() {
+      // Obtener saldo actual de efectivo
+      fetch('/pos/limite-efectivo')
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+          if (result.success) {
+            const saldoActual = parseFloat(result.saldoActual) || 0;
+            
+            // Crear modal de retiro manual
+            const modal = document.createElement('div');
+            modal.id = 'modalRetiroManual';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = 
+              '<div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden" style="animation: slideUp 0.3s ease-out">' +
+                '<div class="p-6 border-b bg-primary-50">' +
+                  '<div class="flex items-center gap-3 mb-2">' +
+                    '<div class="w-12 h-12 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-xl">' +
+                      '<i class="fas fa-money-bill-wave"></i>' +
+                    '</div>' +
+                    '<div>' +
+                      '<h3 class="text-xl font-bold text-gray-800">Realizar Retiro de Efectivo</h3>' +
+                      '<p class="text-sm text-gray-600">Retira efectivo de la caja</p>' +
+                    '</div>' +
+                  '</div>' +
+                '</div>' +
+                '<div class="p-6">' +
+                  '<div class="bg-gray-50 rounded-lg p-4 mb-4">' +
+                    '<div class="text-sm">' +
+                      '<p class="text-gray-500 mb-1">Saldo Actual en Caja:</p>' +
+                      '<p class="text-2xl font-bold text-gray-800">$' + saldoActual.toFixed(2) + '</p>' +
+                    '</div>' +
+                  '</div>' +
+                  '<form id="formRetiroManual" onsubmit="procesarRetiroManual(event)">' +
+                    '<div class="mb-4">' +
+                      '<label class="block text-sm font-medium text-gray-700 mb-2">Monto a Retirar ($)</label>' +
+                      '<input type="number" id="montoRetiroManual" step="0.01" min="0.01" max="' + saldoActual.toFixed(2) + '" required ' +
+                             'class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg" ' +
+                             'placeholder="0.00" autofocus>' +
+                      '<p class="text-xs text-gray-500 mt-1">Máximo disponible: $' + saldoActual.toFixed(2) + '</p>' +
+                    '</div>' +
+                    '<div class="mb-4">' +
+                      '<label class="block text-sm font-medium text-gray-700 mb-2">Observaciones (opcional)</label>' +
+                      '<textarea id="observacionesRetiroManual" rows="2" ' +
+                                'class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent" ' +
+                                'placeholder="Motivo del retiro..."></textarea>' +
+                    '</div>' +
+                    '<div class="flex gap-3">' +
+                      '<button type="submit" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white py-3 px-6 rounded-lg transition font-medium">' +
+                        '<i class="fas fa-money-bill-wave mr-2"></i>Realizar Retiro' +
+                      '</button>' +
+                      '<button type="button" onclick="cerrarModalRetiroManual()" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-3 px-6 rounded-lg transition font-medium">' +
+                        'Cancelar' +
+                      '</button>' +
+                    '</div>' +
+                  '</form>' +
+                '</div>' +
+              '</div>';
+
+            document.body.appendChild(modal);
+            
+            // Cerrar al hacer clic fuera
+            modal.addEventListener('click', function(e) {
+              if (e.target === modal) {
+                cerrarModalRetiroManual();
+              }
+            });
+            
+            // Focus en el input
+            setTimeout(function() {
+              const input = document.getElementById('montoRetiroManual');
+              if (input) {
+                input.focus();
+              }
+            }, 100);
+          } else {
+            alert('Error al obtener el saldo actual');
+          }
+        })
+        .catch(function(error) {
+          console.error('Error al obtener saldo:', error);
+          alert('Error al obtener el saldo actual');
+        });
+    }
+
+    function cerrarModalRetiroManual() {
+      const modal = document.getElementById('modalRetiroManual');
+      if (modal) {
+        modal.style.animation = 'fadeOut 0.2s ease-out';
+        setTimeout(function() { modal.remove(); }, 200);
+      }
+    }
+
+    function procesarRetiroManual(event) {
+      event.preventDefault();
+      
+      const monto = parseFloat(document.getElementById('montoRetiroManual').value);
+      const observaciones = document.getElementById('observacionesRetiroManual').value || 'Retiro manual de efectivo';
+      
+      if (!monto || monto <= 0) {
+        alert('Debes ingresar un monto válido');
+        return;
+      }
+      
+      // Realizar retiro de efectivo directamente de la caja
+      fetch('/pos/retirar-efectivo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          monto: monto.toFixed(2),
+          observaciones: observaciones
+        })
+      })
+      .then(function(response) { return response.json(); })
+      .then(function(result) {
+        if (result.success) {
+          cerrarModalRetiroManual();
+          
+          // Actualizar saldos después del retiro
+          if (typeof window.actualizarSaldos === 'function') {
+            window.actualizarSaldos();
+          }
+          
+          // Mostrar notificación de éxito
+          if (typeof mostrarNotificacion === 'function') {
+            mostrarNotificacion('success', 'Retiro Realizado', 
+              '<p>Se retiraron $' + monto.toFixed(2) + ' de efectivo correctamente.</p>'
+            );
+          } else {
+            alert('Retiro realizado correctamente');
+          }
+        } else {
+          alert(result.error || 'No se pudo realizar el retiro');
+        }
+      })
+      .catch(function(error) {
+        console.error('Error al realizar retiro:', error);
+        alert('Error al realizar el retiro');
+      });
+    }
+  </script>
+
+  <!-- Componente de Búsqueda con Autocompletado -->
+  <script>
+    /**
+     * Crea un componente de búsqueda con autocompletado para reemplazar selects
+     * @param {Object} options - Opciones de configuración
+     * @param {string} options.inputId - ID del input de búsqueda
+     * @param {string} options.hiddenInputId - ID del input hidden que guarda el valor seleccionado
+     * @param {Array} options.options - Array de opciones {id, text, ...}
+     * @param {string} options.placeholder - Placeholder del input
+     * @param {string} options.emptyText - Texto cuando no hay opciones
+     * @param {Function} options.onSelect - Callback cuando se selecciona una opción
+     * @param {string} options.valueKey - Clave para obtener el valor (default: 'id')
+     * @param {string} options.textKey - Clave para obtener el texto (default: 'text')
+     */
+    window.createSearchableSelect = function(options) {
+      const {
+        inputId,
+        hiddenInputId,
+        options: items = [],
+        placeholder = 'Buscar...',
+        emptyText = 'No se encontraron resultados',
+        onSelect = null,
+        valueKey = 'id',
+        textKey = 'text',
+        required = false
+      } = options;
+
+      const input = document.getElementById(inputId);
+      const hiddenInput = document.getElementById(hiddenInputId);
+      if (!input) return;
+
+      // Crear contenedor de resultados
+      const resultsContainer = document.createElement('div');
+      resultsContainer.id = inputId + '_results';
+      resultsContainer.className = 'absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto hidden';
+      input.parentElement.style.position = 'relative';
+      input.parentElement.appendChild(resultsContainer);
+
+      // Ordenar opciones alfabéticamente
+      const sortedItems = [...items].sort((a, b) => {
+        const textA = (a[textKey] || '').toLowerCase();
+        const textB = (b[textKey] || '').toLowerCase();
+        return textA.localeCompare(textB, 'es', { sensitivity: 'base' });
+      });
+
+      let selectedItem = null;
+
+      // Función para renderizar resultados
+      function renderResults(searchTerm = '') {
+        const term = searchTerm.toLowerCase().trim();
+        const filtered = term === '' 
+          ? sortedItems 
+          : sortedItems.filter(item => {
+              const text = (item[textKey] || '').toLowerCase();
+              return text.includes(term);
+            });
+
+        if (filtered.length === 0) {
+          resultsContainer.innerHTML = '<div class="p-3 text-gray-500 text-sm text-center">' + emptyText + '</div>';
+          resultsContainer.classList.remove('hidden');
+          return;
+        }
+
+        resultsContainer.innerHTML = filtered.map(item => {
+          const text = item[textKey] || '';
+          const value = item[valueKey];
+          const highlighted = term === '' ? text : text.replace(
+            new RegExp(`(${term})`, 'gi'),
+            '<mark class="bg-yellow-200">$1</mark>'
+          );
+          return '<div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0" data-value="' + value + '" data-item=\'' + JSON.stringify(item).replace(/'/g, "&#39;") + '\'>' + highlighted + '</div>';
+        }).join('');
+
+        // Agregar event listeners a los resultados
+        resultsContainer.querySelectorAll('[data-value]').forEach(div => {
+          div.addEventListener('click', function() {
+            const item = JSON.parse(this.getAttribute('data-item').replace(/&#39;/g, "'"));
+            selectItem(item);
+          });
+        });
+
+        resultsContainer.classList.remove('hidden');
+      }
+
+      // Función para seleccionar un item
+      function selectItem(item) {
+        selectedItem = item;
+        input.value = item[textKey] || '';
+        if (hiddenInput) {
+          hiddenInput.value = item[valueKey] || '';
+        }
+        resultsContainer.classList.add('hidden');
+        
+        // Validar required
+        if (required) {
+          input.classList.remove('border-red-500');
+        }
+
+        if (onSelect) {
+          onSelect(item);
+        }
+      }
+
+      // Event listeners
+      input.addEventListener('input', function(e) {
+        renderResults(e.target.value);
+      });
+
+      input.addEventListener('focus', function() {
+        if (input.value.trim() === '') {
+          renderResults('');
+        } else {
+          renderResults(input.value);
+        }
+      });
+
+      // Cerrar al hacer click fuera
+      document.addEventListener('click', function(e) {
+        if (!input.parentElement.contains(e.target)) {
+          resultsContainer.classList.add('hidden');
+        }
+      });
+
+      // Manejar teclado
+      input.addEventListener('keydown', function(e) {
+        const visibleResults = resultsContainer.querySelectorAll('[data-value]');
+        if (visibleResults.length === 0) return;
+
+        const currentHighlighted = resultsContainer.querySelector('.bg-blue-100');
+        let nextHighlighted = null;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (currentHighlighted) {
+            nextHighlighted = currentHighlighted.nextElementSibling;
+          } else {
+            nextHighlighted = visibleResults[0];
+          }
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (currentHighlighted) {
+            nextHighlighted = currentHighlighted.previousElementSibling;
+          } else {
+            nextHighlighted = visibleResults[visibleResults.length - 1];
+          }
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (currentHighlighted) {
+            const item = JSON.parse(currentHighlighted.getAttribute('data-item').replace(/&#39;/g, "'"));
+            selectItem(item);
+          } else if (visibleResults.length === 1) {
+            const item = JSON.parse(visibleResults[0].getAttribute('data-item').replace(/&#39;/g, "'"));
+            selectItem(item);
+          }
+          return;
+        } else if (e.key === 'Escape') {
+          resultsContainer.classList.add('hidden');
+          return;
+        }
+
+        if (nextHighlighted) {
+          if (currentHighlighted) {
+            currentHighlighted.classList.remove('bg-blue-100');
+          }
+          nextHighlighted.classList.add('bg-blue-100');
+          nextHighlighted.scrollIntoView({ block: 'nearest' });
+        }
+      });
+
+      // Limpiar selección
+      input.addEventListener('blur', function() {
+        // Pequeño delay para permitir clicks en resultados
+        setTimeout(() => {
+          if (!input.parentElement.contains(document.activeElement)) {
+            resultsContainer.classList.add('hidden');
+          }
+        }, 200);
+      });
+
+      // Inicializar con valor existente si hay
+      if (hiddenInput && hiddenInput.value) {
+        const existingItem = sortedItems.find(item => String(item[valueKey]) === String(hiddenInput.value));
+        if (existingItem) {
+          selectItem(existingItem);
+        }
+      }
+
+      // Validación para required
+      if (required) {
+        const form = input.closest('form');
+        if (form) {
+          form.addEventListener('submit', function(e) {
+            if (!hiddenInput || !hiddenInput.value) {
+              e.preventDefault();
+              input.classList.add('border-red-500');
+              input.focus();
+              return false;
+            }
+          });
+        }
+      }
+
+      return {
+        setValue: function(value) {
+          const item = sortedItems.find(item => String(item[valueKey]) === String(value));
+          if (item) {
+            selectItem(item);
+          }
+        },
+        getValue: function() {
+          return hiddenInput ? hiddenInput.value : null;
+        },
+        clear: function() {
+          input.value = '';
+          if (hiddenInput) hiddenInput.value = '';
+          selectedItem = null;
+        }
+      };
+    };
+  </script>
+</body>
+</html>
+

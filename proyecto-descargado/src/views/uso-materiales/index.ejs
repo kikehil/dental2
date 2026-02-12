@@ -1,0 +1,199 @@
+<%- include('../layout', { body: `
+<div class="max-w-7xl mx-auto">
+  <!-- Header -->
+  <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <div class="flex justify-between items-center mb-4">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-3">
+          <i class="fas fa-boxes text-primary-500"></i>
+          Uso de Materiales
+        </h2>
+        <p class="text-gray-600 mt-1">Registra el uso de materiales en tratamientos</p>
+      </div>
+      <button onclick="abrirModalRegistro()" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
+        <i class="fas fa-plus mr-2"></i> Registrar Uso
+      </button>
+    </div>
+
+    <!-- Filtros -->
+    <form method="GET" action="/uso-materiales" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Material</label>
+        <select name="materialId" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+          <option value="">Todos</option>
+          ${materiales.map(m => '<option value="' + m.id + '" ' + (req.query && req.query.materialId == m.id ? 'selected' : '') + '>' + m.nombre + '</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Paciente</label>
+        <select name="pacienteId" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+          <option value="">Todos</option>
+          ${pacientes.map(p => '<option value="' + p.id + '" ' + (req.query && req.query.pacienteId == p.id ? 'selected' : '') + '>' + p.nombre + ' ' + p.apellido + '</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Doctor</label>
+        <select name="doctorId" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500">
+          <option value="">Todos</option>
+          ${doctores.map(d => '<option value="' + d.id + '" ' + (req.query && req.query.doctorId == d.id ? 'selected' : '') + '>' + d.nombre + ' ' + d.apellido + '</option>').join('')}
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button type="submit" class="w-full bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+          <i class="fas fa-search mr-2"></i>Filtrar
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Tabla de usos -->
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <table class="w-full">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Fecha</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Material</th>
+          <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Cantidad</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Paciente</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Doctor</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Tratamiento ID</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Observaciones</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Usuario</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        ${usos.length > 0 ? usos.map(u => {
+          const fecha = new Date(u.createdAt).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          return '<tr class="hover:bg-gray-50">' +
+            '<td class="px-6 py-4 text-sm text-gray-600">' + fecha + '</td>' +
+            '<td class="px-6 py-4"><span class="font-medium text-gray-800">' + u.material.nombre + '</span></td>' +
+            '<td class="px-6 py-4 text-center"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">' + u.cantidad + '</span></td>' +
+            '<td class="px-6 py-4 text-sm text-gray-600">' + u.paciente.nombre + ' ' + u.paciente.apellido + '</td>' +
+            '<td class="px-6 py-4 text-sm text-gray-600">' + u.doctor.nombre + ' ' + u.doctor.apellido + '</td>' +
+            '<td class="px-6 py-4 text-sm text-gray-600">' + (u.tratamientoId || '-') + '</td>' +
+            '<td class="px-6 py-4 text-sm text-gray-600">' + (u.observaciones || '-') + '</td>' +
+            '<td class="px-6 py-4 text-sm text-gray-600">' + (u.usuario ? u.usuario.nombre : 'Sistema') + '</td>' +
+          '</tr>';
+        }).join('') : '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">No hay registros de uso de materiales</td></tr>'}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal Registrar Uso -->
+<div id="modalRegistro" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-4">Registrar Uso de Material</h3>
+    <form id="formRegistro" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Material *</label>
+        <select id="registroMaterialId" required class="w-full px-3 py-2 border rounded-lg">
+          <option value="">Seleccione un material</option>
+          ${materiales.filter(m => m.activo).map(m => '<option value="' + m.id + '" data-stock="' + m.stock + '">' + m.nombre + ' (Stock: ' + m.stock + ')</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Paciente *</label>
+        <select id="registroPacienteId" required class="w-full px-3 py-2 border rounded-lg">
+          <option value="">Seleccione un paciente</option>
+          ${pacientes.filter(p => p.activo).map(p => '<option value="' + p.id + '">' + p.nombre + ' ' + p.apellido + '</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Doctor *</label>
+        <select id="registroDoctorId" required class="w-full px-3 py-2 border rounded-lg">
+          <option value="">Seleccione un doctor</option>
+          ${doctores.filter(d => d.activo).map(d => '<option value="' + d.id + '">' + d.nombre + ' ' + d.apellido + '</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">ID Tratamiento</label>
+        <input type="number" id="registroTratamientoId" class="w-full px-3 py-2 border rounded-lg" placeholder="Opcional">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad *</label>
+        <input type="number" id="registroCantidad" required min="1" class="w-full px-3 py-2 border rounded-lg" placeholder="1">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+        <textarea id="registroObservaciones" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="Opcional"></textarea>
+      </div>
+      <div class="flex gap-4">
+        <button type="button" onclick="cerrarModalRegistro()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button type="submit" class="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">Registrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function abrirModalRegistro() {
+  document.getElementById('formRegistro').reset();
+  document.getElementById('modalRegistro').classList.remove('hidden');
+}
+
+function cerrarModalRegistro() {
+  document.getElementById('modalRegistro').classList.add('hidden');
+}
+
+// Validar stock disponible
+document.getElementById('registroMaterialId').addEventListener('change', function() {
+  const option = this.options[this.selectedIndex];
+  const stock = parseInt(option.getAttribute('data-stock') || '0');
+  const cantidadInput = document.getElementById('registroCantidad');
+  cantidadInput.setAttribute('max', stock);
+  if (stock === 0) {
+    alert('Este material no tiene stock disponible');
+  }
+});
+
+document.getElementById('formRegistro').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const materialId = document.getElementById('registroMaterialId').value;
+  const option = document.getElementById('registroMaterialId').options[document.getElementById('registroMaterialId').selectedIndex];
+  const stock = parseInt(option.getAttribute('data-stock') || '0');
+  const cantidad = parseInt(document.getElementById('registroCantidad').value);
+  
+  if (cantidad > stock) {
+    alert('Stock insuficiente. Stock disponible: ' + stock);
+    return;
+  }
+  
+  const data = {
+    materialId: materialId,
+    pacienteId: document.getElementById('registroPacienteId').value,
+    doctorId: document.getElementById('registroDoctorId').value,
+    tratamientoId: document.getElementById('registroTratamientoId').value || null,
+    cantidad: cantidad,
+    observaciones: document.getElementById('registroObservaciones').value || null
+  };
+  
+  fetch('/uso-materiales/registrar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success) {
+      location.reload();
+    } else {
+      alert('Error al registrar: ' + (result.error || 'Error desconocido'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error al registrar el uso de material. Por favor, verifica la consola para más detalles.');
+  });
+});
+</script>
+`}) %>
+
+
+
+
+
+
+
+

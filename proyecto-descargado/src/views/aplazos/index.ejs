@@ -1,0 +1,319 @@
+<%
+// Preparar variables JSON antes del include para evitar problemas de parsing
+const pacientesDataJsonStr = JSON.stringify((typeof pacientes !== 'undefined' && pacientes ? pacientes : []).map(function(p) { return { id: p.id, text: p.nombre + ' ' + p.apellido }; }));
+const doctoresDataJsonStr = JSON.stringify((typeof doctores !== 'undefined' && doctores ? doctores : []).map(function(d) { return { id: d.id, text: 'Dr. ' + d.nombre + ' ' + d.apellido }; }));
+const serviciosDataJsonStr = JSON.stringify((typeof servicios !== 'undefined' && servicios ? servicios : []).map(function(s) { return { id: s.id, text: s.nombre + ' - $' + parseFloat(s.precio).toFixed(2), precio: s.precio }; }));
+
+// Construir filas de tratamientos sin usar bloques EJS dentro del template string
+const tratamientosRows = (tratamientos || []).map(function(tratamiento) {
+  const montoTotal = parseFloat(tratamiento.montoTotal || 0);
+  const montoPagado = parseFloat(tratamiento.montoPagado || 0);
+  const montoAdeudado = parseFloat(tratamiento.montoAdeudado || 0);
+  const fechaCreacion = new Date(tratamiento.createdAt).toLocaleDateString('es-MX', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  const estadoClass = tratamiento.estado === 'pagado' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+  const estadoText = tratamiento.estado === 'pagado' ? 'Pagado' : 'Pendiente';
+  const pacienteNombre = tratamiento.paciente ? (tratamiento.paciente.nombre + ' ' + tratamiento.paciente.apellido) : 'N/A';
+  const doctorNombre = tratamiento.doctor ? ('Dr. ' + tratamiento.doctor.nombre + ' ' + tratamiento.doctor.apellido) : 'N/A';
+  const servicioNombre = tratamiento.servicio ? tratamiento.servicio.nombre : 'N/A';
+
+  let html = `
+    <tr class="hover:bg-gray-50 transition-colors">
+      <td class="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">${pacienteNombre}</td>
+      <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">${doctorNombre}</td>
+      <td class="px-4 py-3 text-sm text-gray-900 font-medium">${servicioNombre}</td>
+      <td class="px-4 py-3 text-sm text-gray-900 text-right font-medium whitespace-nowrap">${formatCurrency(montoTotal)}</td>
+      <td class="px-4 py-3 text-sm text-green-600 text-right font-medium whitespace-nowrap">${formatCurrency(montoPagado)}</td>
+      <td class="px-4 py-3 text-sm text-red-600 text-right font-bold whitespace-nowrap">${formatCurrency(montoAdeudado)}</td>
+      <td class="px-4 py-3 text-center whitespace-nowrap">
+        <span class="px-2 py-1 text-xs font-medium rounded-full ${estadoClass}">${estadoText}</span>
+      </td>
+      <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">${fechaCreacion}</td>
+    </tr>
+  `;
+
+  if (tratamiento.notas) {
+    html += `
+      <tr class="bg-gray-50">
+        <td colspan="8" class="px-4 py-2 text-xs text-gray-600 italic">
+          <i class="fas fa-sticky-note mr-1"></i> Notas: ${tratamiento.notas}
+        </td>
+      </tr>
+    `;
+  }
+
+  return html;
+}).join('');
+
+const tratamientosHtml = (tratamientos && tratamientos.length > 0)
+  ? `
+    <div class="overflow-x-auto -mx-6 px-6">
+      <table class="w-full border-collapse min-w-full">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-200">
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Paciente</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Doctor</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Tratamiento</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Monto Total</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Pagado</th>
+            <th class="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">Deuda Actual</th>
+            <th class="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider">Estado</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Fecha</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 bg-white">
+          ${tratamientosRows}
+        </tbody>
+      </table>
+    </div>
+  `
+  : `
+    <div class="text-center py-8 text-gray-500">
+      <i class="fas fa-inbox text-4xl mb-2"></i>
+      <p>No hay tratamientos registrados aún</p>
+    </div>
+  `;
+%>
+<% const bodyHtml = `
+<div class="max-w-4xl mx-auto">
+  <div class="bg-white rounded-xl shadow-sm p-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+      <i class="fas fa-calendar-check text-primary-500"></i> Registrar Tratamiento a Plazos
+    </h2>
+
+    <div id="alertaAplazos" class="hidden"></div>
+
+    <form id="formTratamientoPlazo" class="space-y-6">
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Paciente -->
+        <div style="position: relative;">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Paciente <span class="text-red-500">*</span>
+          </label>
+          <input type="hidden" id="pacienteId" name="pacienteId" required>
+          <input type="text" id="pacienteId_search" 
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Buscar paciente por nombre o apellido..." autocomplete="off">
+        </div>
+
+        <!-- Doctor -->
+        <div style="position: relative;">
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Doctor <span class="text-red-500">*</span>
+          </label>
+          <input type="hidden" id="doctorId" name="doctorId" required>
+          <input type="text" id="doctorId_search" 
+            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            placeholder="Buscar doctor por nombre o apellido..." autocomplete="off">
+        </div>
+      </div>
+
+      <!-- Servicio -->
+      <div style="position: relative;">
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Tratamiento (Servicio) <span class="text-red-500">*</span>
+        </label>
+        <input type="hidden" id="servicioId" name="servicioId" required>
+        <input type="text" id="servicioId_search" 
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          placeholder="Buscar tratamiento..." autocomplete="off">
+      </div>
+
+      <!-- Monto Total -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Monto Total del Tratamiento
+        </label>
+        <div class="bg-gray-50 border border-gray-300 rounded-lg px-4 py-3">
+          <p id="montoTotal" class="text-2xl font-bold text-primary-600">$0.00</p>
+          <p class="text-xs text-gray-500 mt-1">Este monto se calculará automáticamente según el tratamiento seleccionado</p>
+        </div>
+      </div>
+
+      <!-- Notas -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+          Notas (opcional)
+        </label>
+        <textarea id="notas" name="notas" rows="3"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          placeholder="Observaciones adicionales sobre el tratamiento..."></textarea>
+      </div>
+
+      <div class="flex justify-end gap-4 pt-4 border-t border-gray-200">
+        <a href="/pos" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+          Cancelar
+        </a>
+        <button type="submit" class="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition flex items-center gap-2">
+          <i class="fas fa-save"></i>
+          Registrar Tratamiento
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Lista de Tratamientos Registrados -->
+  <div class="bg-white rounded-xl shadow-sm p-6 mt-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+      <i class="fas fa-list text-primary-500"></i> Tratamientos Registrados
+    </h2>
+
+    ${tratamientosHtml}
+  </div>
+</div>
+
+<script>
+const formatCurrency = (amount) => {
+  return '$' + parseFloat(amount || 0).toFixed(2);
+};
+
+const alerta = document.getElementById('alertaAplazos');
+
+function mostrarAlerta(tipo, mensaje) {
+  alerta.className = '';
+  alerta.classList.add('p-3', 'rounded-lg', 'text-sm', 'mb-4');
+  if (tipo === 'ok') {
+    alerta.classList.add('bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200');
+  } else {
+    alerta.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
+  }
+  alerta.textContent = mensaje;
+  alerta.classList.remove('hidden');
+  setTimeout(() => alerta.classList.add('hidden'), 5000);
+}
+
+
+// Manejar envío del formulario
+document.getElementById('formTratamientoPlazo').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const formData = {
+    pacienteId: document.getElementById('pacienteId').value,
+    doctorId: document.getElementById('doctorId').value,
+    servicioId: document.getElementById('servicioId').value,
+    notas: document.getElementById('notas').value,
+  };
+
+  if (!formData.pacienteId || !formData.doctorId || !formData.servicioId) {
+    mostrarAlerta('error', 'Por favor completa todos los campos requeridos');
+    return;
+  }
+
+  try {
+    const response = await fetch('/aplazos/tratamiento', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(formData),
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      mostrarAlerta('ok', 'Tratamiento registrado correctamente');
+      // Limpiar el formulario
+      document.getElementById('formTratamientoPlazo').reset();
+      document.getElementById('montoTotal').textContent = '$0.00';
+      // Recargar la página para mostrar el nuevo tratamiento en la lista
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      mostrarAlerta('error', result.error || 'Error al registrar el tratamiento');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    mostrarAlerta('error', 'Error al registrar el tratamiento');
+  }
+});
+</script>
+`;
+%>
+<%- include('../layout', { body: bodyHtml }) %>
+
+<script>
+// Inicializar componentes de búsqueda con datos del servidor
+(function() {
+  const pacientesData = <%- pacientesDataJsonStr %>;
+  const doctoresData = <%- doctoresDataJsonStr %>;
+  const serviciosData = <%- serviciosDataJsonStr %>;
+  
+  function inicializarComponentesBusqueda() {
+    if (typeof window.createSearchableSelect === 'undefined') {
+      setTimeout(inicializarComponentesBusqueda, 100);
+      return;
+    }
+
+    console.log('Inicializando componentes de búsqueda...');
+    console.log('Pacientes:', pacientesData ? pacientesData.length : 0);
+    console.log('Doctores:', doctoresData ? doctoresData.length : 0);
+    console.log('Servicios:', serviciosData ? serviciosData.length : 0);
+
+    // Componente de búsqueda para Paciente
+    const pacienteInput = document.getElementById('pacienteId_search');
+    if (pacienteInput) {
+      window.createSearchableSelect({
+        inputId: 'pacienteId_search',
+        hiddenInputId: 'pacienteId',
+        options: pacientesData || [],
+        placeholder: 'Buscar paciente por nombre o apellido...',
+        emptyText: 'No se encontraron pacientes',
+        required: true
+      });
+      console.log('Componente de paciente inicializado');
+    }
+
+    // Componente de búsqueda para Doctor
+    const doctorInput = document.getElementById('doctorId_search');
+    if (doctorInput) {
+      window.createSearchableSelect({
+        inputId: 'doctorId_search',
+        hiddenInputId: 'doctorId',
+        options: doctoresData || [],
+        placeholder: 'Buscar doctor por nombre o apellido...',
+        emptyText: 'No se encontraron doctores',
+        required: true
+      });
+      console.log('Componente de doctor inicializado');
+    }
+
+    // Componente de búsqueda para Servicio
+    const servicioInput = document.getElementById('servicioId_search');
+    if (servicioInput) {
+      window.createSearchableSelect({
+        inputId: 'servicioId_search',
+        hiddenInputId: 'servicioId',
+        options: serviciosData || [],
+        placeholder: 'Buscar tratamiento...',
+        emptyText: 'No se encontraron tratamientos',
+        required: true,
+        onSelect: function(item) {
+          const precio = parseFloat(item.precio || 0);
+          const montoTotalEl = document.getElementById('montoTotal');
+          if (montoTotalEl) {
+            if (typeof window.formatearMoneda === 'function') {
+              montoTotalEl.textContent = window.formatearMoneda(precio);
+            } else {
+              montoTotalEl.textContent = '$' + precio.toFixed(2);
+            }
+          }
+        }
+      });
+      console.log('Componente de servicio inicializado');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarComponentesBusqueda);
+  } else {
+    inicializarComponentesBusqueda();
+  }
+})();
+</script>
+

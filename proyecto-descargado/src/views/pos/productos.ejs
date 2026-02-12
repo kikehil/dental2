@@ -1,0 +1,507 @@
+<%- include('../layout', { body: `
+<div class="max-w-7xl mx-auto">
+  ${stockBajo.length > 0 ? '<div class="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg mb-6"><i class="fas fa-exclamation-triangle mr-2"></i><strong>Alerta de stock bajo:</strong> ' + stockBajo.map(p => p.nombre + ' (' + p.stock + ')').join(', ') + '</div>' : ''}
+
+  <!-- Pestañas -->
+  <div class="bg-white rounded-xl shadow-sm mb-6">
+    <div class="flex border-b border-gray-200">
+      <button onclick="mostrarTab('productos')" id="tabProductos" class="px-6 py-4 border-b-2 border-primary-600 text-primary-600 font-medium text-sm transition">
+        <i class="fas fa-box mr-2"></i> Productos
+      </button>
+      <button onclick="mostrarTab('materiales')" id="tabMateriales" class="px-6 py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm transition">
+        <i class="fas fa-cubes mr-2"></i> Materiales
+      </button>
+      <button onclick="mostrarTab('uso-materiales')" id="tabUsoMateriales" class="px-6 py-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm transition">
+        <i class="fas fa-clipboard-list mr-2"></i> Uso de Materiales
+      </button>
+    </div>
+  </div>
+
+  <!-- Contenido Productos -->
+  <div id="contenidoProductos">
+    <div class="flex justify-end mb-6">
+      <button onclick="abrirModal()" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
+        <i class="fas fa-plus mr-2"></i> Nuevo Producto
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Producto</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Categoría</th>
+            <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Stock</th>
+            <th class="px-6 py-4 text-right text-sm font-medium text-gray-600">Precio</th>
+            <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Estado</th>
+            <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          ${productos && productos.length > 0 ? productos.map(p => 
+            '<tr class="hover:bg-gray-50">' +
+              '<td class="px-6 py-4"><p class="font-medium text-gray-800">' + p.nombre + '</p></td>' +
+              '<td class="px-6 py-4 text-gray-600">' + (p.categoria || '-') + '</td>' +
+              '<td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded-full text-sm ' + (p.stock <= p.stockMinimo ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') + '">' + p.stock + '</span></td>' +
+              '<td class="px-6 py-4 text-right font-bold text-secondary-600">' + formatCurrency(p.precio) + '</td>' +
+              '<td class="px-6 py-4 text-center">' + (p.activo ? '<span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span>' : '<span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Inactivo</span>') + '</td>' +
+              '<td class="px-6 py-4 text-center"><button onclick="editarProducto(' + JSON.stringify(p).replace(/"/g, '&quot;') + ')" class="text-primary-600 hover:text-primary-800"><i class="fas fa-edit"></i></button></td>' +
+            '</tr>'
+          ).join('') : '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No hay productos registrados</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Contenido Materiales -->
+  <div id="contenidoMateriales" class="hidden">
+    <div class="flex justify-end mb-6">
+      <button onclick="abrirModalMaterial()" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
+        <i class="fas fa-plus mr-2"></i> Nuevo Material
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Material</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Categoría</th>
+            <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Stock</th>
+            <th class="px-6 py-4 text-right text-sm font-medium text-gray-600">Costo</th>
+            <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Fecha Caducidad</th>
+            <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Estado</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          ${materiales && materiales.length > 0 ? materiales.map(m => {
+            const fechaCaducidad = m.fechaCaducidad ? new Date(m.fechaCaducidad).toLocaleDateString('es-MX') : '-';
+            return '<tr class="hover:bg-gray-50">' +
+              '<td class="px-6 py-4"><p class="font-medium text-gray-800">' + m.nombre + '</p></td>' +
+              '<td class="px-6 py-4 text-gray-600">' + (m.categoria || '-') + '</td>' +
+              '<td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded-full text-sm ' + (m.stock <= m.stockMinimo ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') + '">' + m.stock + '</span></td>' +
+              '<td class="px-6 py-4 text-right font-bold text-secondary-600">' + (m.costo ? formatCurrency(m.costo) : '-') + '</td>' +
+              '<td class="px-6 py-4 text-center text-sm text-gray-600">' + fechaCaducidad + '</td>' +
+              '<td class="px-6 py-4 text-center">' + (m.activo ? '<span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">Activo</span>' : '<span class="px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs">Inactivo</span>') + '</td>' +
+            '</tr>';
+          }).join('') : '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">No hay materiales registrados</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Contenido Uso de Materiales -->
+  <div id="contenidoUsoMateriales" class="hidden">
+    <div class="flex justify-end mb-6">
+      <button onclick="abrirModalRegistro()" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">
+        <i class="fas fa-plus mr-2"></i> Registrar Uso
+      </button>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Fecha</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Material</th>
+            <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Cantidad</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Paciente</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Doctor</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Tratamiento ID</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Observaciones</th>
+            <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Usuario</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          ${(usosMateriales || []).length > 0 ? usosMateriales.map(u => {
+            const fecha = new Date(u.createdAt).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            return '<tr class="hover:bg-gray-50">' +
+              '<td class="px-6 py-4 text-sm text-gray-600">' + fecha + '</td>' +
+              '<td class="px-6 py-4"><span class="font-medium text-gray-800">' + u.material.nombre + '</span></td>' +
+              '<td class="px-6 py-4 text-center"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">' + u.cantidad + '</span></td>' +
+              '<td class="px-6 py-4 text-sm text-gray-600">' + u.paciente.nombre + ' ' + u.paciente.apellido + '</td>' +
+              '<td class="px-6 py-4 text-sm text-gray-600">' + u.doctor.nombre + ' ' + u.doctor.apellido + '</td>' +
+              '<td class="px-6 py-4 text-sm text-gray-600">' + (u.tratamientoId || '-') + '</td>' +
+              '<td class="px-6 py-4 text-sm text-gray-600">' + (u.observaciones || '-') + '</td>' +
+              '<td class="px-6 py-4 text-sm text-gray-600">' + (u.usuario ? u.usuario.nombre : 'Sistema') + '</td>' +
+            '</tr>';
+          }).join('') : '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">No hay registros de uso de materiales</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Producto -->
+<div id="modalProducto" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-4" id="modalTitulo">Nuevo Producto</h3>
+    <form id="formProducto" class="space-y-4">
+      <input type="hidden" id="productoId" name="id">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+        <input type="text" id="productoNombre" name="nombre" required class="w-full px-3 py-2 border rounded-lg">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Precio *</label>
+          <input type="number" id="productoPrecio" name="precio" required step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Costo</label>
+          <input type="number" id="productoCosto" name="costo" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+          <input type="number" id="productoStock" name="stock" value="0" min="0" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo</label>
+          <input type="number" id="productoStockMin" name="stockMinimo" value="5" min="0" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+        <input type="text" id="productoCategoria" name="categoria" class="w-full px-3 py-2 border rounded-lg">
+      </div>
+      <div class="flex items-center">
+        <input type="checkbox" id="productoActivo" name="activo" checked class="mr-2">
+        <label for="productoActivo" class="text-sm text-gray-700">Activo</label>
+      </div>
+      <div class="flex gap-4">
+        <button type="button" onclick="cerrarModal()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button type="submit" class="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Material -->
+<div id="modalMaterial" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-4">Nuevo Material</h3>
+    <form id="formMaterial" class="space-y-4">
+      <input type="hidden" id="materialId" name="id">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+        <input type="text" id="materialNombre" name="nombre" required class="w-full px-3 py-2 border rounded-lg">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+        <textarea id="materialDescripcion" name="descripcion" rows="3" class="w-full px-3 py-2 border rounded-lg"></textarea>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Costo</label>
+          <input type="number" id="materialCosto" name="costo" step="0.01" min="0" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+          <input type="text" id="materialCategoria" name="categoria" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Stock</label>
+          <input type="number" id="materialStock" name="stock" value="0" min="0" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo</label>
+          <input type="number" id="materialStockMin" name="stockMinimo" value="5" min="0" class="w-full px-3 py-2 border rounded-lg">
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de Caducidad</label>
+        <input type="date" id="materialFechaCaducidad" name="fechaCaducidad" class="w-full px-3 py-2 border rounded-lg">
+      </div>
+      <div class="flex items-center">
+        <input type="checkbox" id="materialActivo" name="activo" checked class="mr-2">
+        <label for="materialActivo" class="text-sm text-gray-700">Activo</label>
+      </div>
+      <div class="flex gap-4">
+        <button type="button" onclick="cerrarModalMaterial()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button type="submit" class="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Registrar Uso -->
+<div id="modalRegistroUso" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-4">Registrar Uso de Material</h3>
+    <form id="formRegistroUso" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Material *</label>
+        <select id="registroMaterialId" required class="w-full px-3 py-2 border rounded-lg">
+          <option value="">Seleccione un material</option>
+          ${(materiales || []).filter(m => m.activo).map(m => '<option value="' + m.id + '" data-stock="' + m.stock + '">' + m.nombre + ' (Stock: ' + m.stock + ')</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Paciente *</label>
+        <select id="registroPacienteId" required class="w-full px-3 py-2 border rounded-lg">
+          <option value="">Seleccione un paciente</option>
+          ${(pacientes || []).filter(p => p.activo).map(p => '<option value="' + p.id + '">' + p.nombre + ' ' + p.apellido + '</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Doctor *</label>
+        <select id="registroDoctorId" required class="w-full px-3 py-2 border rounded-lg">
+          <option value="">Seleccione un doctor</option>
+          ${(doctores || []).filter(d => d.activo).map(d => '<option value="' + d.id + '">' + d.nombre + ' ' + d.apellido + '</option>').join('')}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Tratamiento/Servicio</label>
+        <select id="registroTratamientoId" class="w-full px-3 py-2 border rounded-lg">
+          <option value="">Ninguno (Opcional)</option>
+          ${(tratamientosPlazo || []).length > 0 ? '<optgroup label="Tratamientos a Plazos">' + tratamientosPlazo.map(t => {
+            const pacienteNombre = t.paciente ? (t.paciente.nombre + ' ' + t.paciente.apellido) : 'N/A';
+            const servicioNombre = t.servicio ? t.servicio.nombre : 'N/A';
+            const estado = t.estado === 'pagado' ? ' (Pagado)' : t.estado === 'cancelado' ? ' (Cancelado)' : ' (Pendiente)';
+            return '<option value="T' + t.id + '">Tratamiento #' + t.id + ' - ' + pacienteNombre + ' - ' + servicioNombre + estado + '</option>';
+          }).join('') + '</optgroup>' : ''}
+          ${(servicios || []).length > 0 ? '<optgroup label="Servicios Directos">' + servicios.map(s => {
+            return '<option value="S' + s.id + '">' + s.nombre + ' - $' + formatCurrency(s.precio) + '</option>';
+          }).join('') + '</optgroup>' : ''}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Cantidad *</label>
+        <input type="number" id="registroCantidad" required min="1" class="w-full px-3 py-2 border rounded-lg" placeholder="1">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+        <textarea id="registroObservaciones" rows="3" class="w-full px-3 py-2 border rounded-lg" placeholder="Opcional"></textarea>
+      </div>
+      <div class="flex gap-4">
+        <button type="button" onclick="cerrarModalRegistro()" class="flex-1 px-4 py-2 border rounded-lg hover:bg-gray-50">Cancelar</button>
+        <button type="submit" class="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700">Registrar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Función para mostrar pestañas
+function mostrarTab(tab) {
+  const contenidoProductos = document.getElementById('contenidoProductos');
+  const contenidoMateriales = document.getElementById('contenidoMateriales');
+  const contenidoUsoMateriales = document.getElementById('contenidoUsoMateriales');
+  
+  if (contenidoProductos) contenidoProductos.classList.add('hidden');
+  if (contenidoMateriales) contenidoMateriales.classList.add('hidden');
+  if (contenidoUsoMateriales) contenidoUsoMateriales.classList.add('hidden');
+  
+  if (tab === 'productos' && contenidoProductos) contenidoProductos.classList.remove('hidden');
+  if (tab === 'materiales' && contenidoMateriales) contenidoMateriales.classList.remove('hidden');
+  if (tab === 'uso-materiales' && contenidoUsoMateriales) contenidoUsoMateriales.classList.remove('hidden');
+  
+  const tabProductos = document.getElementById('tabProductos');
+  const tabMateriales = document.getElementById('tabMateriales');
+  const tabUsoMateriales = document.getElementById('tabUsoMateriales');
+  
+  [tabProductos, tabMateriales, tabUsoMateriales].forEach(t => {
+    if (t) {
+      t.classList.remove('text-primary-600', 'border-b-2', 'border-primary-600');
+      t.classList.add('text-gray-500', 'border-transparent');
+    }
+  });
+  
+  if (tab === 'productos' && tabProductos) {
+    tabProductos.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
+    tabProductos.classList.remove('text-gray-500', 'border-transparent');
+  } else if (tab === 'materiales' && tabMateriales) {
+    tabMateriales.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
+    tabMateriales.classList.remove('text-gray-500', 'border-transparent');
+  } else if (tab === 'uso-materiales' && tabUsoMateriales) {
+    tabUsoMateriales.classList.add('text-primary-600', 'border-b-2', 'border-primary-600');
+    tabUsoMateriales.classList.remove('text-gray-500', 'border-transparent');
+  }
+}
+
+// Exponer función globalmente
+window.mostrarTab = mostrarTab;
+window._mostrarTabImpl = mostrarTab;
+
+function abrirModal() {
+  document.getElementById('modalTitulo').textContent = 'Nuevo Producto';
+  document.getElementById('formProducto').reset();
+  document.getElementById('productoId').value = '';
+  document.getElementById('modalProducto').classList.remove('hidden');
+}
+
+function cerrarModal() {
+  document.getElementById('modalProducto').classList.add('hidden');
+}
+
+function editarProducto(p) {
+  document.getElementById('modalTitulo').textContent = 'Editar Producto';
+  document.getElementById('productoId').value = p.id;
+  document.getElementById('productoNombre').value = p.nombre;
+  document.getElementById('productoPrecio').value = p.precio;
+  document.getElementById('productoCosto').value = p.costo || '';
+  document.getElementById('productoStock').value = p.stock;
+  document.getElementById('productoStockMin').value = p.stockMinimo;
+  document.getElementById('productoCategoria').value = p.categoria || '';
+  document.getElementById('productoActivo').checked = p.activo;
+  document.getElementById('modalProducto').classList.remove('hidden');
+}
+
+function abrirModalMaterial() {
+  document.getElementById('formMaterial').reset();
+  document.getElementById('materialId').value = '';
+  document.getElementById('modalMaterial').classList.remove('hidden');
+}
+
+function cerrarModalMaterial() {
+  document.getElementById('modalMaterial').classList.add('hidden');
+}
+
+function abrirModalRegistro() {
+  document.getElementById('formRegistroUso').reset();
+  document.getElementById('modalRegistroUso').classList.remove('hidden');
+}
+
+function cerrarModalRegistro() {
+  document.getElementById('modalRegistroUso').classList.add('hidden');
+}
+
+// Exponer funciones globalmente
+window.abrirModalProducto = abrirModal;
+window.abrirModalMaterial = abrirModalMaterial;
+window.abrirModalRegistro = abrirModalRegistro;
+window._abrirModalProductoImpl = abrirModal;
+window._abrirModalMaterialImpl = abrirModalMaterial;
+window._abrirModalRegistroImpl = abrirModalRegistro;
+
+// Guardar producto
+document.getElementById('formProducto').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+  const data = Object.fromEntries(formData);
+  data.activo = document.getElementById('productoActivo').checked ? 'true' : 'false';
+  
+  fetch('/configuracion/productos', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success) {
+      location.reload();
+    } else {
+      alert('Error al guardar: ' + (result.error || 'Error desconocido'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error al guardar el producto. Por favor, verifica la consola para más detalles.');
+  });
+});
+
+// Guardar material
+document.getElementById('formMaterial').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const formData = new FormData(this);
+  const data = Object.fromEntries(formData);
+  data.activo = document.getElementById('materialActivo').checked ? 'true' : 'false';
+  data.stock = parseInt(data.stock) || 0;
+  data.stockMinimo = parseInt(data.stockMinimo) || 5;
+  if (data.costo) data.costo = parseFloat(data.costo);
+  
+  fetch('/configuracion/materiales', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success) {
+      location.reload();
+    } else {
+      alert('Error al guardar: ' + (result.error || 'Error desconocido'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error al guardar el material. Por favor, verifica la consola para más detalles.');
+  });
+});
+
+// Registrar uso de material
+document.getElementById('formRegistroUso').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const materialId = document.getElementById('registroMaterialId').value;
+  const option = document.getElementById('registroMaterialId').options[document.getElementById('registroMaterialId').selectedIndex];
+  const stock = parseInt(option.getAttribute('data-stock') || '0');
+  const cantidad = parseInt(document.getElementById('registroCantidad').value);
+  
+  if (cantidad > stock) {
+    alert('Stock insuficiente. Stock disponible: ' + stock);
+    return;
+  }
+  
+  // Procesar tratamientoId: puede ser "T123" (tratamiento) o "S456" (servicio) o vacío
+  const tratamientoSelect = document.getElementById('registroTratamientoId').value;
+  let tratamientoId = null;
+  if (tratamientoSelect) {
+    if (tratamientoSelect.startsWith('T')) {
+      // Tratamiento a plazos: guardar el ID del tratamiento
+      tratamientoId = parseInt(tratamientoSelect.substring(1)) || null;
+    } else if (tratamientoSelect.startsWith('S')) {
+      // Servicio: guardar el ID del servicio (se guardará como tratamientoId pero es un servicio)
+      tratamientoId = parseInt(tratamientoSelect.substring(1)) || null;
+    } else {
+      // Formato antiguo: intentar parsear directamente
+      tratamientoId = parseInt(tratamientoSelect) || null;
+    }
+  }
+  
+  const data = {
+    materiales: [{
+      materialId: materialId,
+      cantidad: cantidad
+    }],
+    pacienteId: document.getElementById('registroPacienteId').value,
+    doctorId: document.getElementById('registroDoctorId').value,
+    tratamientoId: tratamientoId,
+    observaciones: document.getElementById('registroObservaciones').value || null
+  };
+  
+  fetch('/uso-materiales/registrar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(result => {
+    if (result.success) {
+      location.reload();
+    } else {
+      alert('Error al registrar: ' + (result.error || 'Error desconocido'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error al registrar el uso de material. Por favor, verifica la consola para más detalles.');
+  });
+});
+
+// Validar stock disponible
+document.getElementById('registroMaterialId').addEventListener('change', function() {
+  const option = this.options[this.selectedIndex];
+  const stock = parseInt(option.getAttribute('data-stock') || '0');
+  const cantidadInput = document.getElementById('registroCantidad');
+  cantidadInput.setAttribute('max', stock);
+  if (stock === 0) {
+    alert('Este material no tiene stock disponible');
+  }
+});
+</script>
+`}) %>

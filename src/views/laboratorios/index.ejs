@@ -1,0 +1,56 @@
+<%- include('../layout', { body: `
+<div class="mb-6 flex justify-between items-center">
+  <form action="/laboratorios" method="GET" class="flex gap-2">
+    <input type="text" name="search" value="${search}" placeholder="Buscar laboratorio..." 
+      class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 w-full md:w-64">
+    <button type="submit" class="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 transition">
+      <i class="fas fa-search"></i>
+    </button>
+  </form>
+  <a href="/laboratorios/crear" class="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition flex items-center gap-2">
+    <i class="fas fa-plus"></i>
+    Nuevo Laboratorio
+  </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Nombre</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Contacto</th>
+          <th class="px-6 py-4 text-left text-sm font-medium text-gray-600">Teléfono</th>
+          <th class="px-6 py-4 text-center text-sm font-medium text-gray-600">Acciones</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        ` + (laboratorios.length > 0 ? laboratorios.map(function(l) {
+          return '<tr class="hover:bg-gray-50">' +
+            '<td class="px-6 py-4">' +
+              '<div class="flex items-center gap-3">' +
+                '<div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 font-bold">' +
+                  '<i class="fas fa-flask"></i>' +
+                '</div>' +
+                '<div>' +
+                  '<p class="font-medium text-gray-800">' + l.nombre + '</p>' +
+                '</div>' +
+              '</div>' +
+            '</td>' +
+            '<td class="px-6 py-4 text-gray-600">' + (l.contacto || '-') + '</td>' +
+            '<td class="px-6 py-4 text-gray-600">' + (l.telefono || '-') + '</td>' +
+            '<td class="px-6 py-4 text-center">' +
+              '<a href="/laboratorios/' + l.id + '" class="text-primary-600 hover:text-primary-800 mx-1" title="Ver"><i class="fas fa-eye"></i></a>' +
+              '<a href="/laboratorios/' + l.id + '/editar" class="text-gray-600 hover:text-gray-800 mx-1" title="Editar"><i class="fas fa-edit"></i></a>' +
+              '<form action="/laboratorios/' + l.id + '/eliminar" method="POST" class="inline" onsubmit="return confirm(\'¿Estás seguro de eliminar este laboratorio?\')">' +
+                '<button type="submit" class="text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash"></i></button>' +
+              '</form>' +
+            '</td>' +
+          '</tr>';
+        }).join('') : '<tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">No se encontraron laboratorios</td></tr>') + `
+      </tbody>
+    </table>
+  </div>
+</div>
+`}) %>
+

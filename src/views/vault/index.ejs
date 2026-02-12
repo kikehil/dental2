@@ -1,0 +1,362 @@
+<%- include('../layout', { body: `
+<div class="max-w-6xl mx-auto space-y-6">
+  <!-- Resumen principal -->
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-primary-100">
+      <p class="text-sm text-gray-500">Ingresado hoy (USD)</p>
+      <p class="text-3xl font-bold text-primary-600 mt-1">${formatUsd(ingresosTotal || 0)}</p>
+      <p class="text-xs text-gray-400 mt-1">Ventas en USD + ingresos manuales</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-amber-100">
+      <p class="text-sm text-gray-500">Saldo disponible hoy</p>
+      <p class="text-3xl font-bold text-amber-600 mt-1">${formatUsd(saldoDisponible || 0)}</p>
+      <p class="text-xs text-gray-400 mt-1">Se resta lo ya movido a ahorro</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-emerald-100">
+      <p class="text-sm text-gray-500">Ahorro acumulado</p>
+      <p class="text-3xl font-bold text-emerald-600 mt-1">${formatUsd(ahorroActual || 0)}</p>
+      <p class="text-xs text-gray-400 mt-1">Últimos retiros se descuentan</p>
+    </div>
+  </div>
+
+  <!-- Desglose por método -->
+  <div class="grid md:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center text-xl">
+          <i class="fas fa-hand-holding-usd"></i>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500">Efectivo</p>
+          <p class="text-xl font-bold text-green-600">${formatUsd(ingresosDetalle.efectivo || 0)}</p>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+          <i class="fas fa-credit-card"></i>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500">Tarjeta</p>
+          <p class="text-xl font-bold text-blue-600">${formatUsd((ingresosDetalle.tarjeta && ingresosDetalle.tarjeta.total) || 0)}</p>
+        </div>
+      </div>
+      ${ingresosDetalle.tarjeta && ingresosDetalle.tarjeta.total > 0 ? `
+      <div class="mt-2 pt-2 border-t border-gray-100 space-y-1 text-xs">
+        ${ingresosDetalle.tarjeta.bbva > 0 ? `
+        <div class="flex justify-between text-gray-600">
+          <span>BBVA:</span>
+          <span class="font-medium">${formatUsd(ingresosDetalle.tarjeta.bbva)}</span>
+        </div>
+        ` : ''}
+        ${ingresosDetalle.tarjeta.azteca > 0 ? `
+        <div class="flex justify-between text-gray-600">
+          <span>Azteca:</span>
+          <span class="font-medium">${formatUsd(ingresosDetalle.tarjeta.azteca)}</span>
+        </div>
+        ` : ''}
+        ${ingresosDetalle.tarjeta.mercadopago > 0 ? `
+        <div class="flex justify-between text-gray-600">
+          <span>Mercado Pago:</span>
+          <span class="font-medium">${formatUsd(ingresosDetalle.tarjeta.mercadopago)}</span>
+        </div>
+        ` : ''}
+      </div>
+      ` : ''}
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-12 h-12 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+          <i class="fas fa-exchange-alt"></i>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500">Transferencia</p>
+          <p class="text-xl font-bold text-purple-600">${formatUsd((ingresosDetalle.transferencia && ingresosDetalle.transferencia.total) || 0)}</p>
+        </div>
+      </div>
+      ${ingresosDetalle.transferencia && ingresosDetalle.transferencia.total > 0 ? `
+      <div class="mt-2 pt-2 border-t border-gray-100 space-y-1 text-xs">
+        ${ingresosDetalle.transferencia.bbva > 0 ? `
+        <div class="flex justify-between text-gray-600">
+          <span>BBVA:</span>
+          <span class="font-medium">${formatUsd(ingresosDetalle.transferencia.bbva)}</span>
+        </div>
+        ` : ''}
+        ${ingresosDetalle.transferencia.azteca > 0 ? `
+        <div class="flex justify-between text-gray-600">
+          <span>Azteca:</span>
+          <span class="font-medium">${formatUsd(ingresosDetalle.transferencia.azteca)}</span>
+        </div>
+        ` : ''}
+        ${ingresosDetalle.transferencia.mercadopago > 0 ? `
+        <div class="flex justify-between text-gray-600">
+          <span>Mercado Pago:</span>
+          <span class="font-medium">${formatUsd(ingresosDetalle.transferencia.mercadopago)}</span>
+        </div>
+        ` : ''}
+      </div>
+      ` : ''}
+    </div>
+  </div>
+
+  <div id="alertaVault" class="hidden"></div>
+
+  <!-- Formularios -->
+  <div class="grid lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-arrow-right-arrow-left text-amber-500"></i> Mover a ahorro
+        </h3>
+        <span class="text-xs text-gray-400">Disponible: <strong>${formatUsd(saldoDisponible || 0)}</strong></span>
+      </div>
+      <form id="formAhorro" class="space-y-3">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Monto a mover</label>
+          <input id="montoAhorro" type="number" step="0.01" min="0" max="${saldoDisponible || 0}" name="monto" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500">
+          <p class="text-xs text-gray-400 mt-1">No puede superar el saldo disponible del día.</p>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Nota (opcional)</label>
+          <textarea name="nota" rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500" placeholder="Ej. Resguardo de caja en USD"></textarea>
+        </div>
+        <button type="submit" class="w-full bg-amber-500 text-white py-2 rounded-lg hover:bg-amber-600 transition font-medium">
+          Trasladar a ahorro
+        </button>
+      </form>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100">
+      <div class="flex justify-between items-center mb-4">
+        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <i class="fas fa-wallet text-emerald-500"></i> Retirar desde ahorro
+        </h3>
+        <span class="text-xs text-gray-400">Ahorro: <strong>${formatUsd(ahorroActual || 0)}</strong></span>
+      </div>
+      <form id="formRetiro" class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Monto a retirar</label>
+          <input id="montoRetiro" type="number" step="0.01" min="0" max="${ahorroActual || 0}" name="monto" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-2">Método de retiro <span class="text-red-500">*</span></label>
+          <select id="metodoRetiro" name="metodo" required class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-gray-700 font-medium">
+            <option value="">Selecciona un método de retiro</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="bbva">Bancomer (BBVA)</option>
+            <option value="mercadopago">Mercado Pago</option>
+            <option value="azteca">Banco Azteca</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-600 mb-1">Nota (opcional)</label>
+          <textarea name="nota" rows="2" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" placeholder="Ej. Retiro para pago externo"></textarea>
+        </div>
+        <button type="button" id="btnConfirmarRetiro" disabled class="w-full py-3 rounded-lg transition font-semibold flex items-center justify-center gap-2 border-2 shadow-sm bg-gray-400 text-gray-700 border-gray-400 cursor-not-allowed">
+          <i class="fas fa-check-circle"></i>
+          <span>Confirmar retiro</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <i class="fas fa-list text-primary-500"></i> Movimientos de hoy
+      </h3>
+      <span class="text-xs text-gray-400">${movimientosHoy.length} movimiento(s)</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-2 text-left text-gray-500">Tipo</th>
+            <th class="px-4 py-2 text-left text-gray-500">Método</th>
+            <th class="px-4 py-2 text-right text-gray-500">Monto</th>
+            <th class="px-4 py-2 text-left text-gray-500">Nota</th>
+            <th class="px-4 py-2 text-left text-gray-500">Hora</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          ${movimientosHoy.length === 0 ? `
+            <tr><td colspan="5" class="px-4 py-6 text-center text-gray-500">Aún no hay movimientos registrados hoy.</td></tr>
+          ` : movimientosHoy.map(function(m) { 
+              const tipoLabel = m.tipo === 'ingreso' ? 'Ingreso' : (m.tipo === 'traslado_ahorro' ? 'Ahorro' : 'Retiro ahorro');
+              const tipoColor = m.tipo === 'ingreso' ? 'bg-blue-100 text-blue-700' : (m.tipo === 'traslado_ahorro' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700');
+              let metodoLabel = m.metodo;
+              if (metodoLabel === 'bbva') metodoLabel = 'BBVA';
+              if (metodoLabel === 'azteca') metodoLabel = 'Azteca';
+              if (metodoLabel === 'mercadopago') metodoLabel = 'Mercado Pago';
+              if (m.banco) {
+                const bancoLabel = m.banco.toLowerCase() === 'bbva' ? 'BBVA' : (m.banco.toLowerCase() === 'azteca' ? 'Azteca' : 'Mercado Pago');
+                metodoLabel = metodoLabel + ' - ' + bancoLabel;
+              }
+              return `
+              <tr>
+                <td class="px-4 py-2"><span class="px-2 py-1 rounded-full text-xs ${tipoColor}">${tipoLabel}</span></td>
+                <td class="px-4 py-2 text-gray-700">${metodoLabel}</td>
+                <td class="px-4 py-2 text-right font-semibold text-gray-800">${formatUsd(parseFloat(m.monto))}</td>
+                <td class="px-4 py-2 text-gray-500">${m.nota ? m.nota : '-'}</td>
+                <td class="px-4 py-2 text-gray-500">${moment(m.createdAt).tz(config.timezone).format('HH:mm')}</td>
+              </tr>
+              `;
+            }).join('')
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const alerta = document.getElementById('alertaVault');
+
+function mostrarAlerta(tipo, mensaje) {
+  alerta.className = '';
+  alerta.classList.add('p-3', 'rounded-lg', 'text-sm', 'mt-2');
+  if (tipo === 'ok') {
+    alerta.classList.add('bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200');
+  } else {
+    alerta.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
+  }
+  alerta.textContent = mensaje;
+  alerta.classList.remove('hidden');
+  setTimeout(() => alerta.classList.add('hidden'), 3000);
+}
+
+async function postJSON(url, data) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const result = await resp.json();
+  if (!resp.ok || !result.success) {
+    const err = result.error || 'Ocurrió un error';
+    throw new Error(err);
+  }
+  return result;
+}
+
+document.getElementById('formAhorro').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target));
+  try {
+    await postJSON('/vault/mover-ahorro', data);
+    mostrarAlerta('ok', 'Se movió a ahorro correctamente');
+    setTimeout(() => window.location.reload(), 1000);
+  } catch (err) {
+    mostrarAlerta('error', err.message);
+  }
+});
+
+// Función para validar el formulario y habilitar/deshabilitar el botón
+function validarFormulario() {
+  const montoInput = document.getElementById('montoRetiro');
+  const metodoSelect = document.getElementById('metodoRetiro');
+  const btnConfirmar = document.getElementById('btnConfirmarRetiro');
+  const monto = parseFloat(montoInput.value) || 0;
+  const ahorroMaximo = parseFloat(montoInput.max) || 0;
+  const metodoSeleccionado = metodoSelect.value && metodoSelect.value !== '';
+  
+  // Validar que haya monto y método seleccionado
+  const montoValido = monto > 0 && monto <= ahorroMaximo;
+  
+  // Solo cambiar clases CSS, NUNCA modificar el contenido del botón
+  if (montoValido && metodoSeleccionado) {
+    // Botón habilitado - verde con texto azul marino
+    btnConfirmar.disabled = false;
+    btnConfirmar.classList.remove('bg-gray-400', 'text-gray-700', 'border-gray-400', 'cursor-not-allowed', 'shadow-sm', 'text-white');
+    btnConfirmar.classList.add('bg-emerald-600', 'text-blue-900', 'border-emerald-600', 'hover:bg-emerald-700', 'hover:border-emerald-700', 'cursor-pointer', 'shadow-md');
+  } else {
+    // Botón deshabilitado - gris
+    btnConfirmar.disabled = true;
+    btnConfirmar.classList.remove('bg-emerald-600', 'text-blue-900', 'border-emerald-600', 'hover:bg-emerald-700', 'hover:border-emerald-700', 'cursor-pointer', 'shadow-md');
+    btnConfirmar.classList.add('bg-gray-400', 'text-gray-700', 'border-gray-400', 'cursor-not-allowed', 'shadow-sm');
+  }
+}
+
+// Función para manejar el retiro
+async function handleWithdraw() {
+  const formData = new FormData(document.getElementById('formRetiro'));
+  const monto = parseFloat(formData.get('monto'));
+  const metodo = formData.get('metodo');
+  const nota = formData.get('nota') || '';
+  
+  if (!monto || monto <= 0) {
+    mostrarAlerta('error', 'Debes ingresar un monto válido');
+    return;
+  }
+  
+  if (!metodo || metodo === '') {
+    mostrarAlerta('error', 'Debes seleccionar un método de retiro');
+    return;
+  }
+  
+  try {
+    await postJSON('/vault/retiro-ahorro', {
+      monto: monto.toFixed(2),
+      metodo: metodo,
+      nota: nota
+    });
+    mostrarAlerta('ok', 'Retiro registrado correctamente');
+    setTimeout(() => window.location.reload(), 1000);
+  } catch (err) {
+    mostrarAlerta('error', err.message);
+  }
+}
+
+// Función para asegurar que el contenido del botón siempre esté presente
+function asegurarContenidoBoton() {
+  const btnConfirmar = document.getElementById('btnConfirmarRetiro');
+  if (!btnConfirmar) return;
+  
+  const icon = btnConfirmar.querySelector('i.fa-check-circle');
+  const span = btnConfirmar.querySelector('span');
+  
+  // Si falta el icono o el span, restaurar el contenido completo
+  if (!icon || !span || !span.textContent || span.textContent.trim() === '') {
+    btnConfirmar.innerHTML = '<i class="fas fa-check-circle"></i><span>Confirmar retiro</span>';
+  }
+}
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+  // Asegurar contenido del botón al cargar
+  asegurarContenidoBoton();
+  
+  // Validar formulario cuando cambie el monto
+  const montoInput = document.getElementById('montoRetiro');
+  montoInput.addEventListener('input', function() {
+    asegurarContenidoBoton();
+    validarFormulario();
+  });
+  montoInput.addEventListener('change', function() {
+    asegurarContenidoBoton();
+    validarFormulario();
+  });
+  
+  // Validar formulario cuando cambie el método de retiro
+  const metodoSelect = document.getElementById('metodoRetiro');
+  metodoSelect.addEventListener('change', function() {
+    asegurarContenidoBoton();
+    validarFormulario();
+  });
+  
+  // Event listener para el botón de confirmar
+  document.getElementById('btnConfirmarRetiro').addEventListener('click', handleWithdraw);
+  
+  // Validar formulario inicial
+  validarFormulario();
+  
+  // Observar cambios en el botón para asegurar que el contenido siempre esté presente
+  const btnConfirmar = document.getElementById('btnConfirmarRetiro');
+  const observer = new MutationObserver(function(mutations) {
+    asegurarContenidoBoton();
+  });
+  observer.observe(btnConfirmar, { childList: true, subtree: true });
+});
+</script>
+` }) %>

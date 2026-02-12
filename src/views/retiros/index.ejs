@@ -1,0 +1,208 @@
+<%
+// Preparar variables antes del include para evitar problemas de parsing
+const fechaInicioStr = fechaInicio || "";
+const fechaFinStr = fechaFin || "";
+const retirosLengthStr = retiros.length || 0;
+const totalRetirosStr = totalRetiros || 0;
+const formatCurrencyFunc = formatCurrency;
+const momentFunc = moment;
+const configObj = config;
+
+// Construir HTML de la tabla de retiros
+let retirosTableHtml = '';
+if (retiros && retiros.length > 0) {
+  let retirosRows = '';
+  retiros.forEach(function(retiro) {
+    retirosRows += 
+      '<tr class="hover:bg-gray-50 transition">' +
+        '<td class="px-6 py-4 whitespace-nowrap">' +
+          '<div class="text-sm text-gray-900">' +
+            momentFunc(retiro.createdAt).tz(configObj.timezone).format('DD/MM/YYYY') +
+          '</div>' +
+          '<div class="text-xs text-gray-500">' +
+            momentFunc(retiro.createdAt).tz(configObj.timezone).format('HH:mm:ss') +
+          '</div>' +
+        '</td>' +
+        '<td class="px-6 py-4 whitespace-nowrap">' +
+          '<span class="text-lg font-bold text-amber-600">' +
+            formatCurrencyFunc(retiro.monto) +
+          '</span>' +
+        '</td>' +
+        '<td class="px-6 py-4 whitespace-nowrap">' +
+          '<div class="flex items-center">' +
+            '<div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center mr-3">' +
+              '<i class="fas fa-user text-primary-600 text-xs"></i>' +
+            '</div>' +
+            '<div>' +
+              '<div class="text-sm font-medium text-gray-900">' +
+                (retiro.usuario ? retiro.usuario.nombre : 'Sistema') +
+              '</div>' +
+              (retiro.usuario && retiro.usuario.email ? 
+                '<div class="text-xs text-gray-500">' + retiro.usuario.email + '</div>' : '') +
+            '</div>' +
+          '</div>' +
+        '</td>' +
+        '<td class="px-6 py-4">' +
+          '<div class="text-sm text-gray-600">' +
+            (retiro.observaciones || '-') +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+  });
+  
+  retirosTableHtml = 
+    '<div class="overflow-x-auto">' +
+      '<table class="w-full">' +
+        '<thead class="bg-gray-50">' +
+          '<tr>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha y Hora</th>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>' +
+            '<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observaciones</th>' +
+          '</tr>' +
+        '</thead>' +
+        '<tbody class="bg-white divide-y divide-gray-200">' +
+          retirosRows +
+        '</tbody>' +
+        '<tfoot class="bg-gray-50">' +
+          '<tr>' +
+            '<td class="px-6 py-4 text-right font-bold text-gray-700" colspan="3">Total:</td>' +
+            '<td class="px-6 py-4 whitespace-nowrap">' +
+              '<span class="text-xl font-bold text-amber-600">' +
+                formatCurrencyFunc(totalRetirosStr) +
+              '</span>' +
+            '</td>' +
+          '</tr>' +
+        '</tfoot>' +
+      '</table>' +
+    '</div>';
+} else {
+  retirosTableHtml = 
+    '<div class="p-12 text-center">' +
+      '<div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">' +
+        '<i class="fas fa-inbox text-gray-400 text-2xl"></i>' +
+      '</div>' +
+      '<p class="text-gray-500 text-lg">No se encontraron retiros en el período seleccionado</p>' +
+      '<p class="text-gray-400 text-sm mt-2">Intenta ajustar el rango de fechas</p>' +
+    '</div>';
+}
+
+// Construir HTML del gráfico de retiros por día
+let retirosPorDiaHtml = '';
+if (Object.keys(retirosPorDia).length > 0) {
+  let diasHtml = '';
+  Object.keys(retirosPorDia).sort().reverse().forEach(function(fecha) {
+    diasHtml += 
+      '<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">' +
+        '<div class="flex items-center gap-3">' +
+          '<div class="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">' +
+            '<i class="fas fa-calendar-day text-amber-600"></i>' +
+          '</div>' +
+          '<div>' +
+            '<p class="text-sm font-medium text-gray-900">' +
+              momentFunc(fecha).format('DD/MM/YYYY') +
+            '</p>' +
+            '<p class="text-xs text-gray-500">' +
+              retirosPorDia[fecha].cantidad + ' retiro(s)' +
+            '</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="text-right">' +
+          '<p class="text-lg font-bold text-amber-600">' +
+            formatCurrencyFunc(retirosPorDia[fecha].total) +
+          '</p>' +
+        '</div>' +
+      '</div>';
+  });
+  
+  retirosPorDiaHtml = 
+    '<div class="bg-white rounded-xl shadow-lg p-6 mt-6">' +
+      '<h3 class="text-lg font-bold text-gray-800 mb-4">Retiros por Día</h3>' +
+      '<div class="space-y-3">' +
+        diasHtml +
+      '</div>' +
+    '</div>';
+}
+
+// Construir todo el body HTML antes del include
+const bodyHtml = 
+  '<div class="max-w-7xl mx-auto">' +
+    '<!-- Header -->' +
+    '<div class="bg-white rounded-xl shadow-lg p-6 mb-6">' +
+      '<div class="flex justify-between items-center mb-4">' +
+        '<div>' +
+          '<h2 class="text-2xl font-bold text-gray-800 flex items-center gap-3">' +
+            '<i class="fas fa-hand-holding-usd text-amber-500"></i>' +
+            'Historial de Retiros' +
+          '</h2>' +
+          '<p class="text-gray-600 mt-1">Consulta todos los retiros de efectivo realizados</p>' +
+        '</div>' +
+      '</div>' +
+      '<!-- Filtros de fecha -->' +
+      '<form method="GET" action="/retiros" class="flex gap-4 items-end">' +
+        '<div class="flex-1">' +
+          '<label class="block text-sm font-medium text-gray-700 mb-2">Fecha Inicio</label>' +
+          '<input type="date" name="fechaInicio" value="' + fechaInicioStr + '" ' +
+                 'class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">' +
+        '</div>' +
+        '<div class="flex-1">' +
+          '<label class="block text-sm font-medium text-gray-700 mb-2">Fecha Fin</label>' +
+          '<input type="date" name="fechaFin" value="' + fechaFinStr + '" ' +
+                 'class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">' +
+        '</div>' +
+        '<div>' +
+          '<button type="submit" class="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2 rounded-lg transition font-medium">' +
+            '<i class="fas fa-search mr-2"></i>Buscar' +
+          '</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>' +
+    '<!-- Resumen -->' +
+    '<div class="grid md:grid-cols-3 gap-4 mb-6">' +
+      '<div class="bg-white rounded-xl shadow-lg p-6">' +
+        '<div class="flex items-center justify-between">' +
+          '<div>' +
+            '<p class="text-sm text-gray-600 mb-1">Total de Retiros</p>' +
+            '<p class="text-3xl font-bold text-gray-800">' + retirosLengthStr + '</p>' +
+          '</div>' +
+          '<div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">' +
+            '<i class="fas fa-hand-holding-usd text-amber-600 text-xl"></i>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bg-white rounded-xl shadow-lg p-6">' +
+        '<div class="flex items-center justify-between">' +
+          '<div>' +
+            '<p class="text-sm text-gray-600 mb-1">Monto Total Retirado</p>' +
+            '<p class="text-3xl font-bold text-amber-600">' + formatCurrencyFunc(totalRetirosStr) + '</p>' +
+          '</div>' +
+          '<div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">' +
+            '<i class="fas fa-dollar-sign text-green-600 text-xl"></i>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bg-white rounded-xl shadow-lg p-6">' +
+        '<div class="flex items-center justify-between">' +
+          '<div>' +
+            '<p class="text-sm text-gray-600 mb-1">Promedio por Retiro</p>' +
+            '<p class="text-3xl font-bold text-blue-600">' +
+              (retirosLengthStr > 0 ? formatCurrencyFunc(totalRetirosStr / retirosLengthStr) : formatCurrencyFunc(0)) +
+            '</p>' +
+          '</div>' +
+          '<div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">' +
+            '<i class="fas fa-chart-line text-blue-600 text-xl"></i>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<!-- Tabla de retiros -->' +
+    '<div class="bg-white rounded-xl shadow-lg overflow-hidden">' +
+      '<div class="p-6 border-b border-gray-200">' +
+        '<h3 class="text-lg font-bold text-gray-800">Lista de Retiros</h3>' +
+      '</div>' +
+      retirosTableHtml +
+    '</div>' +
+    retirosPorDiaHtml +
+  '</div>';
+%>
+<%- include('../layout', { body: bodyHtml }) %>

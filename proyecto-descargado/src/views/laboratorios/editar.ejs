@@ -1,0 +1,47 @@
+<%- include('../layout', { body: `
+<div class="max-w-2xl mx-auto">
+  <div class="bg-white rounded-xl shadow-sm p-6">
+    ${error ? '<div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-6"><i class="fas fa-exclamation-circle mr-2"></i>' + error + '</div>' : ''}
+
+    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+      <i class="fas fa-flask text-primary-500"></i> Editar Laboratorio
+    </h2>
+
+    <form action="/laboratorios/${laboratorio.id}/editar" method="POST" class="space-y-6">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Nombre *</label>
+        <input type="text" name="nombre" required value="${laboratorio.nombre || ''}"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+          placeholder="Nombre del laboratorio">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Contacto</label>
+        <input type="text" name="contacto" value="${laboratorio.contacto || ''}"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+          placeholder="Nombre del contacto">
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">Teléfono</label>
+        <input type="tel" name="telefono" value="${laboratorio.telefono || ''}"
+          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+          placeholder="Teléfono de contacto">
+      </div>
+
+      <div class="flex gap-4 pt-4 border-t border-gray-200">
+        <a href="/laboratorios" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+          Cancelar
+        </a>
+        <button type="submit" class="bg-primary-600 text-white px-6 py-2 rounded-lg hover:bg-primary-700 transition flex items-center gap-2">
+          <i class="fas fa-save"></i>
+          Actualizar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+`}) %>
+
+
+

@@ -1,0 +1,552 @@
+<%- include('../layout', { body: `
+<div class="max-w-6xl mx-auto">
+  <!-- Pestañas -->
+  <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <div class="border-b border-gray-200 mb-6">
+      <nav class="flex space-x-8">
+        <a href="/gastos" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">
+          Gastos Generales
+        </a>
+        <a href="/gastos/laboratorio" class="px-4 py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium">
+          <i class="fas fa-flask mr-2"></i>Pagos a Laboratorios
+        </a>
+        <a href="/gastos/prestamos" class="px-4 py-2 border-b-2 border-primary-500 text-primary-600 font-medium">
+          <i class="fas fa-hand-holding-usd mr-2"></i>Préstamos al Personal
+        </a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-gray-800">Préstamos al Personal</h2>
+      <div class="flex gap-2">
+        <button onclick="window.abrirModalNuevoPrestamo()" class="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-lg">
+          <i class="fas fa-plus mr-2"></i>Nuevo Préstamo
+        </button>
+        <button onclick="window.abrirModalConsulta()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+          <i class="fas fa-search mr-2"></i>Consulta
+        </button>
+        <a href="/gastos/prestamos/conceptos" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+          <i class="fas fa-cog mr-2"></i>Gestionar Conceptos
+        </a>
+      </div>
+    </div>
+
+    ${success ? '<div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">' + success + '</div>' : ''}
+    ${error ? '<div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">' + error + '</div>' : ''}
+
+    <!-- Listado de personas con deudas activas -->
+    <div class="overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Persona</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deuda Pendiente</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Pagado</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Deuda</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          ${deudasActivas && deudasActivas.length > 0 ? deudasActivas.map(function(deuda) {
+            return '<tr class="hover:bg-gray-50">' +
+              '<td class="px-4 py-3 text-sm font-medium text-gray-900">' + deuda.doctorNombre + '</td>' +
+              '<td class="px-4 py-3 whitespace-nowrap text-sm font-bold text-red-600">' + formatCurrency(deuda.totalPendiente) + '</td>' +
+              '<td class="px-4 py-3 whitespace-nowrap text-sm text-green-600">' + formatCurrency(deuda.totalPagado) + '</td>' +
+              '<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">' + formatCurrency(deuda.totalDeuda) + '</td>' +
+              '<td class="px-4 py-3 whitespace-nowrap text-sm">' +
+                '<button onclick="window.verDetalle(' + deuda.doctorId + ')" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded mr-2">' +
+                  '<i class="fas fa-eye mr-1"></i>Ver Detalle' +
+                '</button>' +
+              '</td>' +
+            '</tr>';
+          }).join('') : '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No hay préstamos activos registrados</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Nuevo Préstamo -->
+<div id="modalNuevoPrestamo" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+  <div class="relative p-6 border w-full max-w-md shadow-lg rounded-lg bg-white m-4">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-gray-900">Nuevo Préstamo</h3>
+      <button onclick="window.cerrarModalNuevoPrestamo()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <form id="formNuevoPrestamo" onsubmit="window.guardarPrestamo(event)">
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Doctor</label>
+        <select name="doctorId" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+          <option value="">Seleccione un doctor</option>
+          ${doctores && doctores.length > 0 ? doctores.map(function(doctor) {
+            return '<option value="' + doctor.id + '">' + doctor.nombre + ' ' + doctor.apellido + '</option>';
+          }).join('') : ''}
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Concepto</label>
+        <select name="conceptoId" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+          <option value="">Seleccione un concepto</option>
+          ${conceptos && conceptos.length > 0 ? conceptos.map(function(concepto) {
+            return '<option value="' + concepto.id + '">' + concepto.nombre + '</option>';
+          }).join('') : ''}
+        </select>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Monto</label>
+        <input type="number" name="monto" step="0.01" min="0.01" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="0.00">
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Notas (opcional)</label>
+        <textarea name="notas" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500" placeholder="Observaciones adicionales..."></textarea>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" onclick="window.cerrarModalNuevoPrestamo()" class="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg">Cancelar</button>
+        <button type="submit" class="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Consulta de Préstamos -->
+<div id="modalConsulta" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+  <div class="relative p-6 border w-11/12 max-w-4xl shadow-lg rounded-lg bg-white m-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-gray-900">Consulta de Préstamos</h3>
+      <button onclick="window.cerrarModalConsulta()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Seleccione un Doctor</label>
+      <select id="selectDoctorConsulta" onchange="window.consultarPrestamosPorDoctor()" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+        <option value="">-- Seleccione un doctor --</option>
+        ${doctores && doctores.length > 0 ? doctores.map(function(doctor) {
+          return '<option value="' + doctor.id + '">' + doctor.nombre + ' ' + doctor.apellido + '</option>';
+        }).join('') : ''}
+      </select>
+    </div>
+    <div id="resultadoConsulta" class="mt-4">
+      <div class="text-center py-8 text-gray-500">
+        <i class="fas fa-info-circle text-3xl mb-2"></i>
+        <p>Seleccione un doctor para ver sus préstamos</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Detalle de Préstamos -->
+<div id="modalDetalle" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+  <div class="relative p-6 border w-full max-w-5xl shadow-lg rounded-lg bg-white m-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-lg font-bold text-gray-900" id="tituloDetalle">Detalle de Préstamos</h3>
+      <button onclick="window.cerrarModalDetalle()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div id="contenidoDetalle">
+      <div class="text-center py-8">
+        <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
+        <p class="mt-2 text-gray-500">Cargando...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de Notificación -->
+<div id="modalNotificacion" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+  <div class="relative p-6 border w-full max-w-md shadow-lg rounded-lg bg-white m-4">
+    <div class="text-center">
+      <div id="notificacionIcono" class="mb-4">
+        <i class="fas fa-info-circle text-4xl text-blue-500"></i>
+      </div>
+      <h3 id="notificacionTitulo" class="text-lg font-bold text-gray-900 mb-2"></h3>
+      <p id="notificacionMensaje" class="text-gray-700 mb-4"></p>
+      <button onclick="window.cerrarModalNotificacion()" class="px-6 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg">
+        Aceptar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Función para mostrar notificaciones modales
+window.mostrarNotificacion = function(titulo, mensaje, tipo = 'info') {
+  const modal = document.getElementById('modalNotificacion');
+  const icono = document.getElementById('notificacionIcono');
+  const tituloEl = document.getElementById('notificacionTitulo');
+  const mensajeEl = document.getElementById('notificacionMensaje');
+  
+  tituloEl.textContent = titulo;
+  mensajeEl.textContent = mensaje;
+  
+  // Cambiar icono según el tipo
+  let iconoClass = 'fas fa-info-circle text-4xl text-blue-500';
+  if (tipo === 'success') {
+    iconoClass = 'fas fa-check-circle text-4xl text-green-500';
+  } else if (tipo === 'error') {
+    iconoClass = 'fas fa-exclamation-circle text-4xl text-red-500';
+  } else if (tipo === 'warning') {
+    iconoClass = 'fas fa-exclamation-triangle text-4xl text-yellow-500';
+  }
+  
+  icono.innerHTML = '<i class="' + iconoClass + '"></i>';
+  modal.classList.remove('hidden');
+};
+
+window.cerrarModalNotificacion = function() {
+  const modal = document.getElementById('modalNotificacion');
+  modal.classList.add('hidden');
+};
+
+// Asegurar que las funciones estén disponibles globalmente
+window.abrirModalNuevoPrestamo = function() {
+  try {
+    const modal = document.getElementById('modalNuevoPrestamo');
+    if (modal) {
+      modal.classList.remove('hidden');
+    } else {
+      console.error('Modal no encontrado');
+      window.mostrarNotificacion('Error', 'No se pudo abrir el modal. Por favor recarga la página.', 'error');
+    }
+  } catch (error) {
+    console.error('Error al abrir modal:', error);
+    window.mostrarNotificacion('Error', 'Error al abrir el modal', 'error');
+  }
+};
+
+window.cerrarModalNuevoPrestamo = function() {
+  try {
+    const modal = document.getElementById('modalNuevoPrestamo');
+    const form = document.getElementById('formNuevoPrestamo');
+    if (modal) {
+      modal.classList.add('hidden');
+    }
+    if (form) {
+      form.reset();
+    }
+  } catch (error) {
+    console.error('Error al cerrar modal:', error);
+  }
+};
+
+window.guardarPrestamo = async function(event) {
+  event.preventDefault();
+  try {
+    const form = event.target;
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+
+    // Validar que los campos requeridos estén llenos
+    if (!data.doctorId || !data.conceptoId || !data.monto) {
+      window.mostrarNotificacion('Validación', 'Por favor completa todos los campos requeridos', 'warning');
+      return;
+    }
+
+    // Convertir monto a número
+    data.monto = parseFloat(data.monto);
+    if (isNaN(data.monto) || data.monto <= 0) {
+      window.mostrarNotificacion('Validación', 'El monto debe ser un número mayor a 0', 'warning');
+      return;
+    }
+
+    // Convertir IDs a enteros
+    data.doctorId = parseInt(data.doctorId);
+    data.conceptoId = parseInt(data.conceptoId);
+
+    const response = await fetch('/gastos/prestamos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      window.mostrarNotificacion('Éxito', 'Préstamo registrado exitosamente', 'success');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      window.mostrarNotificacion('Error', result.error || 'No se pudo guardar el préstamo', 'error');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    window.mostrarNotificacion('Error', 'Error al guardar el préstamo: ' + error.message, 'error');
+  }
+};
+
+window.verDetalle = async function(doctorId) {
+  const modal = document.getElementById('modalDetalle');
+  const contenido = document.getElementById('contenidoDetalle');
+  const titulo = document.getElementById('tituloDetalle');
+
+  modal.classList.remove('hidden');
+  contenido.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i><p class="mt-2 text-gray-500">Cargando...</p></div>';
+
+  try {
+    const response = await fetch('/gastos/prestamos/detalle/' + doctorId);
+    const result = await response.json();
+
+    if (result.success) {
+      titulo.textContent = 'Detalle de Préstamos - ' + result.doctor.nombre;
+      
+      let html = '<div class="mb-4 grid grid-cols-3 gap-4">';
+      html += '<div class="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">';
+      html += '<p class="text-sm text-gray-600 mb-1">Total Deuda</p>';
+      html += '<p class="text-2xl font-bold text-red-600">' + window.formatCurrency(result.totales.total) + '</p>';
+      html += '</div>';
+      html += '<div class="bg-yellow-50 rounded-lg p-4 border-l-4 border-yellow-500">';
+      html += '<p class="text-sm text-gray-600 mb-1">Pendiente</p>';
+      html += '<p class="text-2xl font-bold text-yellow-600">' + window.formatCurrency(result.totales.pendiente) + '</p>';
+      html += '</div>';
+      html += '<div class="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">';
+      html += '<p class="text-sm text-gray-600 mb-1">Pagado</p>';
+      html += '<p class="text-2xl font-bold text-green-600">' + window.formatCurrency(result.totales.pagado) + '</p>';
+      html += '</div>';
+      html += '</div>';
+
+      html += '<div class="overflow-x-auto">';
+      html += '<table class="w-full">';
+      html += '<thead class="bg-gray-50"><tr>';
+      html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>';
+      html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Concepto</th>';
+      html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto</th>';
+      html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>';
+      html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Notas</th>';
+      html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>';
+      html += '</tr></thead>';
+      html += '<tbody class="bg-white divide-y divide-gray-200">';
+
+      result.prestamos.forEach(function(prestamo) {
+        const fecha = new Date(prestamo.createdAt);
+        const fechaFormateada = fecha.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        
+        html += '<tr class="hover:bg-gray-50">';
+        html += '<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">' + fechaFormateada + '</td>';
+        html += '<td class="px-4 py-3 text-sm text-gray-900">' + prestamo.concepto.nombre + '</td>';
+        html += '<td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-700">' + window.formatCurrency(parseFloat(prestamo.monto)) + '</td>';
+        html += '<td class="px-4 py-3 whitespace-nowrap">';
+        
+        if (prestamo.estatus === 'pendiente') {
+          html += '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Pendiente</span>';
+        } else {
+          html += '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Pagado</span>';
+        }
+        
+        html += '</td>';
+        html += '<td class="px-4 py-3 text-sm text-gray-500">' + (prestamo.notas || '-') + '</td>';
+        html += '<td class="px-4 py-3 whitespace-nowrap text-sm">';
+        
+        if (prestamo.estatus === 'pendiente') {
+          html += '<button onclick="window.cambiarEstatus(' + prestamo.id + ', &quot;pagado&quot;)" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs">Marcar como Pagado</button>';
+        } else {
+          html += '<button onclick="window.cambiarEstatus(' + prestamo.id + ', &quot;pendiente&quot;)" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded text-xs">Marcar como Pendiente</button>';
+        }
+        
+        html += '</td>';
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      html += '</div>';
+
+      contenido.innerHTML = html;
+    } else {
+      contenido.innerHTML = '<div class="text-center py-8 text-red-500">Error al cargar el detalle</div>';
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    contenido.innerHTML = '<div class="text-center py-8 text-red-500">Error al cargar el detalle</div>';
+  }
+}
+
+window.cerrarModalDetalle = function() {
+  const modal = document.getElementById('modalDetalle');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+};
+
+window.cambiarEstatus = async function(prestamoId, nuevoEstatus) {
+  if (!confirm('¿Está seguro de cambiar el estatus de este préstamo?')) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/gastos/prestamos/' + prestamoId + '/estatus', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ estatus: nuevoEstatus }),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      // Recargar el detalle
+      const doctorId = result.prestamo.doctorId;
+      window.verDetalle(doctorId);
+      // También recargar la página principal después de un momento
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } else {
+      window.mostrarNotificacion('Error', result.error || 'No se pudo actualizar el estatus', 'error');
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    window.mostrarNotificacion('Error', 'Error al actualizar el estatus', 'error');
+  }
+}
+
+window.formatCurrency = function(amount) {
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN'
+  }).format(amount);
+};
+
+// Funciones para modal de consulta
+window.abrirModalConsulta = function() {
+  try {
+    const modal = document.getElementById('modalConsulta');
+    if (modal) {
+      modal.classList.remove('hidden');
+      // Limpiar resultado anterior
+      document.getElementById('resultadoConsulta').innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-info-circle text-3xl mb-2"></i><p>Seleccione un doctor para ver sus préstamos</p></div>';
+      document.getElementById('selectDoctorConsulta').value = '';
+    } else {
+      console.error('Modal de consulta no encontrado');
+      window.mostrarNotificacion('Error', 'No se pudo abrir el modal de consulta.', 'error');
+    }
+  } catch (error) {
+    console.error('Error al abrir modal de consulta:', error);
+    window.mostrarNotificacion('Error', 'Error al abrir el modal de consulta', 'error');
+  }
+};
+
+window.cerrarModalConsulta = function() {
+  const modal = document.getElementById('modalConsulta');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+};
+
+window.consultarPrestamosPorDoctor = async function() {
+  const doctorId = document.getElementById('selectDoctorConsulta').value;
+  const resultado = document.getElementById('resultadoConsulta');
+
+  if (!doctorId) {
+    resultado.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-info-circle text-3xl mb-2"></i><p>Seleccione un doctor para ver sus préstamos</p></div>';
+    return;
+  }
+
+  resultado.innerHTML = '<div class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i><p class="mt-2 text-gray-500">Cargando...</p></div>';
+
+  try {
+    const response = await fetch('/gastos/prestamos/detalle/' + doctorId);
+    const result = await response.json();
+
+    if (result.success) {
+      let html = '<div class="bg-white rounded-lg shadow-sm p-4 mb-4">';
+      html += '<h4 class="text-lg font-semibold text-gray-800 mb-4">Préstamos de: ' + result.doctor.nombre + '</h4>';
+      
+      // Estadísticas
+      html += '<div class="grid grid-cols-3 gap-4 mb-4">';
+      html += '<div class="bg-red-50 rounded-lg p-3 border-l-4 border-red-500">';
+      html += '<p class="text-xs text-gray-600 mb-1">Total Deuda</p>';
+      html += '<p class="text-xl font-bold text-red-600">' + window.formatCurrency(result.totales.total) + '</p>';
+      html += '</div>';
+      html += '<div class="bg-yellow-50 rounded-lg p-3 border-l-4 border-yellow-500">';
+      html += '<p class="text-xs text-gray-600 mb-1">Pendiente</p>';
+      html += '<p class="text-xl font-bold text-yellow-600">' + window.formatCurrency(result.totales.pendiente) + '</p>';
+      html += '</div>';
+      html += '<div class="bg-green-50 rounded-lg p-3 border-l-4 border-green-500">';
+      html += '<p class="text-xs text-gray-600 mb-1">Pagado</p>';
+      html += '<p class="text-xl font-bold text-green-600">' + window.formatCurrency(result.totales.pagado) + '</p>';
+      html += '</div>';
+      html += '</div>';
+
+      // Tabla de préstamos
+      if (result.prestamos && result.prestamos.length > 0) {
+        html += '<div class="overflow-x-auto">';
+        html += '<table class="w-full text-sm">';
+        html += '<thead class="bg-gray-50"><tr>';
+        html += '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>';
+        html += '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Concepto</th>';
+        html += '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Monto</th>';
+        html += '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estatus</th>';
+        html += '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Registrado por</th>';
+        html += '<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Notas</th>';
+        html += '</tr></thead>';
+        html += '<tbody class="bg-white divide-y divide-gray-200">';
+
+        result.prestamos.forEach(function(prestamo) {
+          const fecha = new Date(prestamo.createdAt);
+          const fechaFormateada = fecha.toLocaleDateString('es-MX', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+          
+          html += '<tr class="hover:bg-gray-50">';
+          html += '<td class="px-3 py-2 whitespace-nowrap text-gray-900">' + fechaFormateada + '</td>';
+          html += '<td class="px-3 py-2 text-gray-900">' + prestamo.concepto.nombre + '</td>';
+          html += '<td class="px-3 py-2 whitespace-nowrap font-medium text-gray-700">' + window.formatCurrency(parseFloat(prestamo.monto)) + '</td>';
+          html += '<td class="px-3 py-2 whitespace-nowrap">';
+          
+          if (prestamo.estatus === 'pendiente') {
+            html += '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Pendiente</span>';
+          } else {
+            html += '<span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Pagado</span>';
+          }
+          
+          html += '</td>';
+          html += '<td class="px-3 py-2 text-gray-500 text-xs">' + (prestamo.usuario ? prestamo.usuario.nombre : 'N/A') + '</td>';
+          html += '<td class="px-3 py-2 text-gray-500 text-xs">' + (prestamo.notas || '-') + '</td>';
+          html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        html += '</div>';
+      } else {
+        html += '<div class="text-center py-8 text-gray-500">';
+        html += '<i class="fas fa-inbox text-3xl mb-2"></i>';
+        html += '<p>No se encontraron préstamos para este doctor</p>';
+        html += '</div>';
+      }
+
+      html += '</div>';
+      resultado.innerHTML = html;
+    } else {
+      resultado.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle text-3xl mb-2"></i><p>Error al cargar los préstamos</p></div>';
+    }
+  } catch (error) {
+    console.error('Error:', error);
+    resultado.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-circle text-3xl mb-2"></i><p>Error al consultar los préstamos</p></div>';
+  }
+};
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('Página de préstamos cargada');
+  // Verificar que las funciones estén disponibles
+  if (typeof window.abrirModalNuevoPrestamo === 'function') {
+    console.log('Funciones JavaScript cargadas correctamente');
+  } else {
+    console.error('Error: Las funciones JavaScript no están disponibles');
+  }
+});
+</script>
+` }) %>
+
