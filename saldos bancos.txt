@@ -1,0 +1,5 @@
+¿Cómo funciona ahora?
+Si haces un corte de efectivo: Puedes retirar dinero o cerrar el efectivo varias veces al día. Los totales de "Tarjeta" y "Transferencia" en el tablero seguirán sumándose (acumulándose) hasta que decidas hacer el cierre de terminal/bancos.
+Si haces un cierre de bancos: En ese momento es cuando los contadores de tarjetas y transferencias se reinician.
+Corte General: Un corte manual o de fin de día seguirá cerrando ambos periodos, funcionando como un reset total para el día siguiente.
+Estos cambios garantizan que los saldos bancarios se preserven a través de múltiples eventos de efectivo, cumpliendo con tu requerimiento de separar el control de caja del control bancario.

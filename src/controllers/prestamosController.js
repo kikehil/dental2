@@ -25,11 +25,11 @@ const index = async (req, res) => {
 
     // Agrupar por doctor y calcular deudas
     const deudasPorDoctor = {};
-    
+
     prestamos.forEach(prestamo => {
       const doctorId = prestamo.doctorId;
       const doctorNombre = `${prestamo.doctor.nombre} ${prestamo.doctor.apellido}`;
-      
+
       if (!deudasPorDoctor[doctorId]) {
         deudasPorDoctor[doctorId] = {
           doctorId: doctorId,
@@ -41,12 +41,12 @@ const index = async (req, res) => {
           totalPagado: 0,
         };
       }
-      
+
       deudasPorDoctor[doctorId].prestamos.push(prestamo);
-      
+
       const monto = parseFloat(prestamo.monto);
       deudasPorDoctor[doctorId].totalDeuda += monto;
-      
+
       if (prestamo.estatus === 'pendiente') {
         deudasPorDoctor[doctorId].totalPendiente += monto;
       } else if (prestamo.estatus === 'pagado') {
@@ -180,20 +180,76 @@ const store = async (req, res) => {
       return res.status(400).json({ error: 'Concepto no encontrado' });
     }
 
-    // Crear el préstamo
-    const prestamo = await prisma.prestamo.create({
-      data: {
-        doctorId: parseInt(doctorId),
-        conceptoId: parseInt(conceptoId),
-        monto: montoNum,
-        estatus: 'pendiente',
-        notas: notas || null,
-        usuarioId: req.session.user?.id || null,
+    // --- VALIDACIÓN DE EFECTIVO EN CAJA ---
+    const hoy = moment().tz(config.timezone).startOf('day').toDate();
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
+      where: {
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-      include: {
-        doctor: true,
-        concepto: true,
-      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!ultimoResetEfectivo) {
+      return res.status(400).json({ error: 'No se puede realizar préstamos sin una caja abierta (Saldo Inicial).' });
+    }
+
+    const desdeFechaEfectivo = ultimoResetEfectivo.createdAt;
+    let saldoInicialEfectivo = parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0);
+
+    const ventasEfectivoLista = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { total: true }
+    });
+    const gastosEfectivoLista = await prisma.gasto.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { monto: true }
+    });
+
+    const sumVentasEfectivo = ventasEfectivoLista.reduce((sum, v) => sum + parseFloat(v.total), 0);
+    const sumGastosEfectivo = gastosEfectivoLista.reduce((sum, g) => sum + parseFloat(g.monto), 0);
+    const saldoActualEfectivo = saldoInicialEfectivo + sumVentasEfectivo - sumGastosEfectivo;
+
+    if (montoNum > saldoActualEfectivo) {
+      return res.status(400).json({
+        error: `Fondos insuficientes. Solo hay ${formatCurrency(saldoActualEfectivo)} en efectivo y solicitaste ${formatCurrency(montoNum)}.`
+      });
+    }
+
+    // Usar transacción para crear el préstamo y el gasto correspondiente
+    const prestamo = await prisma.$transaction(async (tx) => {
+      // 1. Crear el préstamo
+      const p = await tx.prestamo.create({
+        data: {
+          doctorId: parseInt(doctorId),
+          conceptoId: parseInt(conceptoId),
+          monto: montoNum,
+          estatus: 'pendiente',
+          notas: notas || null,
+          usuarioId: req.session.user?.id || null,
+        },
+        include: {
+          doctor: true,
+          concepto: true,
+        },
+      });
+
+      // 2. Crear el registro de gasto para que se descuente del corte de caja
+      await tx.gasto.create({
+        data: {
+          motivo: `PRÉSTAMO: ${doctor.nombre} ${doctor.apellido}`,
+          monto: montoNum,
+          metodoPago: 'efectivo',
+          tipo: 'general',
+          observaciones: `Concepto: ${concepto.nombre}. ${notas || ''}`.trim(),
+          usuarioId: req.session.user?.id || null,
+        }
+      });
+
+      return p;
     });
 
     res.json({ success: true, prestamo });

@@ -9,14 +9,14 @@ const { notifyNewSale } = require('../utils/webhooks');
 const getUltimoCorteHoy = async () => {
   const hoy = moment().tz(config.timezone).startOf('day').toDate();
   const mañana = moment().tz(config.timezone).endOf('day').toDate();
-  
+
   const ultimoCorte = await prisma.corteCaja.findFirst({
     where: {
       fecha: { gte: hoy, lte: mañana },
     },
     orderBy: { createdAt: 'desc' },
   });
-  
+
   return ultimoCorte;
 };
 
@@ -25,7 +25,7 @@ const getConfiguracionCortes = async () => {
   let configCortes = await prisma.configuracionCortes.findFirst({
     where: { activo: true },
   });
-  
+
   // Si no existe configuración, crear una con valores por defecto
   if (!configCortes) {
     configCortes = await prisma.configuracionCortes.create({
@@ -36,7 +36,7 @@ const getConfiguracionCortes = async () => {
       },
     });
   }
-  
+
   return configCortes;
 };
 
@@ -47,7 +47,7 @@ const index = async (req, res) => {
     console.log('Usuario en sesión:', req.session?.user ? JSON.stringify(req.session.user) : 'No hay sesión');
     console.log('Query params:', req.query);
     const ultimoCorte = await getUltimoCorteHoy();
-    
+
     // Verificar si necesita saldo inicial
     // 1. Si viene del login con el parámetro
     // 2. No hay saldo inicial hoy
@@ -57,7 +57,7 @@ const index = async (req, res) => {
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
     const ayer = moment().tz(config.timezone).subtract(1, 'day').startOf('day').toDate();
     const finAyer = moment().tz(config.timezone).subtract(1, 'day').endOf('day').toDate();
-    
+
     // Buscar el último corte del día (si existe)
     const ultimoCorteHoy = await prisma.corteCaja.findFirst({
       where: {
@@ -66,7 +66,7 @@ const index = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     // Buscar el saldo inicial más reciente (después del último corte si existe)
     let saldoInicialHoy;
     if (ultimoCorteHoy) {
@@ -89,15 +89,15 @@ const index = async (req, res) => {
         orderBy: { createdAt: 'desc' },
       });
     }
-    
+
     // Necesita saldo inicial si:
     // - Viene con el parámetro necesitaSaldoInicial=true (siempre mostrar, sin importar si hay saldo inicial)
     // - No hay saldo inicial después del último corte (si hay corte)
     // - No hay saldo inicial del día (si no hay corte)
-    const necesitaSaldoInicial = 
+    const necesitaSaldoInicial =
       req.query.necesitaSaldoInicial === 'true' ||
       !saldoInicialHoy;
-    
+
     // PRIORIDAD 1: Si necesita saldo inicial, mostrar modal primero (no importa si necesita corte)
     // El saldo inicial es más importante que el corte - debe ingresarse antes de cualquier corte
     // Si viene con el parámetro necesitaSaldoInicial=true, siempre mostrar el modal
@@ -111,17 +111,17 @@ const index = async (req, res) => {
       // Obtener saldo actual de efectivo después de retiros (si hay corte previo)
       let saldoPredefinido = 0;
       const saldoPredefinidoParam = req.query.saldoPredefinido;
-      
+
       if (saldoPredefinidoParam) {
         saldoPredefinido = parseFloat(saldoPredefinidoParam) || 0;
       } else if (ultimoCorteHoy) {
         // Si hay corte pero no viene saldo predefinido, calcular el saldo actual después de retiros
         let desdeFecha;
         let saldoInicialEfectivo = 0;
-        
+
         desdeFecha = ultimoCorteHoy.createdAt;
         saldoInicialEfectivo = parseFloat(ultimoCorteHoy.saldoFinalEfectivo || 0);
-        
+
         // Obtener ventas y gastos desde el último corte
         const ventas = await prisma.venta.findMany({
           where: {
@@ -130,7 +130,7 @@ const index = async (req, res) => {
           },
           select: { total: true },
         });
-        
+
         const gastos = await prisma.gasto.findMany({
           where: {
             createdAt: { gte: desdeFecha },
@@ -138,12 +138,12 @@ const index = async (req, res) => {
           },
           select: { monto: true },
         });
-        
+
         const ventasEfectivo = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
         const gastosEfectivo = gastos.reduce((sum, g) => sum + parseFloat(g.monto), 0);
         saldoPredefinido = saldoInicialEfectivo + ventasEfectivo - gastosEfectivo;
       }
-      
+
       // Cargar categorías de forma segura (puede no existir aún)
       let categorias = [];
       try {
@@ -156,10 +156,10 @@ const index = async (req, res) => {
       }
 
       const [servicios, productos, pacientes, doctores] = await Promise.all([
-        prisma.servicio.findMany({ 
-          where: { activo: true }, 
+        prisma.servicio.findMany({
+          where: { activo: true },
           include: prisma.categoria ? { categoria: true } : false,
-          orderBy: { nombre: 'asc' } 
+          orderBy: { nombre: 'asc' }
         }),
         prisma.producto.findMany({ where: { activo: true }, orderBy: { nombre: 'asc' } }),
         prisma.paciente.findMany({ where: { activo: true }, take: 100, orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }] }),
@@ -186,7 +186,7 @@ const index = async (req, res) => {
         doctoresDataJson,
       });
     }
-    
+
     // Cargar categorías de forma segura (puede no existir aún)
     let categorias = [];
     try {
@@ -199,10 +199,10 @@ const index = async (req, res) => {
     }
 
     const [servicios, productos, pacientes, doctores] = await Promise.all([
-      prisma.servicio.findMany({ 
-        where: { activo: true }, 
+      prisma.servicio.findMany({
+        where: { activo: true },
         include: prisma.categoria ? { categoria: true } : false,
-        orderBy: { nombre: 'asc' } 
+        orderBy: { nombre: 'asc' }
       }),
       prisma.producto.findMany({ where: { activo: true }, orderBy: { nombre: 'asc' } }),
       prisma.paciente.findMany({ where: { activo: true }, take: 100, orderBy: [{ apellido: 'asc' }, { nombre: 'asc' }] }),
@@ -335,7 +335,7 @@ const processSale = async (req, res) => {
 const ventas = async (req, res) => {
   try {
     const { fecha } = req.query;
-    
+
     // Calcular inicio y fin del día
     const hoy = fecha ? new Date(fecha) : new Date();
     const inicioDia = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 0, 0, 0);
@@ -393,27 +393,27 @@ const ventas = async (req, res) => {
     const totalHoy = ventasHoy.reduce((sum, v) => sum + parseFloat(v.total), 0);
     const cantidadHoy = ventasHoy.length;
     const promedio = cantidadHoy > 0 ? totalHoy / cantidadHoy : 0;
-    
+
     // Método más popular
     const metodos = {};
     ventasHoy.forEach(v => {
       metodos[v.metodoPago] = (metodos[v.metodoPago] || 0) + 1;
     });
-    const metodoPopular = Object.keys(metodos).length > 0 
+    const metodoPopular = Object.keys(metodos).length > 0
       ? Object.keys(metodos).reduce((a, b) => metodos[a] > metodos[b] ? a : b)
       : 'N/A';
 
     // Calcular estado de caja de la sesión actual
     const hoyCaja = moment().tz(config.timezone).startOf('day').toDate();
     const mañanaCaja = moment().tz(config.timezone).endOf('day').toDate();
-    
+
     const saldoInicialDelDia = await prisma.corteCaja.findFirst({
       where: {
         fecha: { gte: hoyCaja, lte: mañanaCaja },
         hora: null,
       },
     });
-    
+
     const ultimoCorte = await prisma.corteCaja.findFirst({
       where: {
         fecha: { gte: hoyCaja, lte: mañanaCaja },
@@ -421,14 +421,14 @@ const ventas = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     let saldoInicial = 0;
     let ventasDesdeUltimoCorte = [];
-    
+
     if (ultimoCorte) {
       saldoInicial = parseFloat(ultimoCorte.saldoFinal);
       const desdeUltimoCorte = ultimoCorte.createdAt;
-      
+
       ventasDesdeUltimoCorte = await prisma.venta.findMany({
         where: {
           createdAt: { gte: desdeUltimoCorte },
@@ -441,7 +441,7 @@ const ventas = async (req, res) => {
     } else if (saldoInicialDelDia) {
       saldoInicial = parseFloat(saldoInicialDelDia.saldoInicial);
       const desdeSaldoInicial = saldoInicialDelDia.createdAt;
-      
+
       ventasDesdeUltimoCorte = await prisma.venta.findMany({
         where: {
           createdAt: { gte: desdeSaldoInicial },
@@ -463,7 +463,7 @@ const ventas = async (req, res) => {
         },
       });
     }
-    
+
     const totalVentasSesion = ventasDesdeUltimoCorte.reduce((sum, v) => sum + parseFloat(v.total), 0);
     const ventasEfectivoSesion = ventasDesdeUltimoCorte
       .filter(v => v.metodoPago === 'efectivo')
@@ -474,7 +474,7 @@ const ventas = async (req, res) => {
     const ventasTransferenciaSesion = ventasDesdeUltimoCorte
       .filter(v => v.metodoPago === 'transferencia')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     const saldoEsperado = saldoInicial + ventasEfectivoSesion;
 
     res.render('pos/ventas', {
@@ -670,18 +670,18 @@ const getVenta = async (req, res) => {
 // Guardar saldo inicial
 const guardarSaldoInicial = async (req, res) => {
   try {
-    const { 
-      saldoInicial, 
-      saldoInicialEfectivo, 
-      saldoInicialTarjeta, 
-      saldoInicialTransferencia 
+    const {
+      saldoInicial,
+      saldoInicialEfectivo,
+      saldoInicialTarjeta,
+      saldoInicialTransferencia
     } = req.body;
-    
+
     // Si vienen saldos individuales, usarlos; si no, usar el saldo inicial único
     let efectivo = 0;
     let tarjeta = 0;
     let transferencia = 0;
-    
+
     if (saldoInicialEfectivo !== undefined || saldoInicialTarjeta !== undefined || saldoInicialTransferencia !== undefined) {
       efectivo = parseFloat(saldoInicialEfectivo || 0);
       tarjeta = parseFloat(saldoInicialTarjeta || 0);
@@ -703,23 +703,48 @@ const guardarSaldoInicial = async (req, res) => {
     // Permitir crear múltiples saldos iniciales en el mismo día
     // Esto es necesario porque después de cada corte se debe crear un nuevo saldo inicial
     // No validamos si ya existe uno, simplemente creamos uno nuevo
-    const hoy = moment().tz(config.timezone).startOf('day').toDate();
-    const mañana = moment().tz(config.timezone).endOf('day').toDate();
+    // --- Lógica de Herencia de Bancos para Saldo Inicial ---
+    // Si no se proporcionaron saldos de bancos (o son 0), heredamos los actuales para no romper la acumulación multidía
+    const ultimoResetBancos = await prisma.corteCaja.findFirst({
+      where: {
+        OR: [
+          { AND: [{ hora: { not: null } }, { OR: [{ ventasTarjeta: { gt: 0 } }, { ventasTransferencia: { gt: 0 } }] }] },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: 0 }] },
+          { AND: [{ hora: null }, { OR: [{ saldoInicialTarjetaAzteca: { gt: 0 } }, { saldoInicialTarjetaBbva: { gt: 0 } }, { saldoInicialTarjetaMp: { gt: 0 } }, { saldoInicialTransferencia: { gt: 0 } }] }] }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-    const saldoInicialTotal = efectivo + tarjeta + transferencia;
+    let sTA = tarjeta, sTB = 0, sTM = 0;
+    let sTrA = transferencia, sTrB = 0, sTrM = 0;
+
+    if (tarjeta === 0 && ultimoResetBancos) {
+      sTA = parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || 0);
+      sTB = parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || 0);
+      sTM = parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || 0);
+    }
+    if (transferencia === 0 && ultimoResetBancos) {
+      sTrA = parseFloat(ultimoResetBancos.saldoFinalTransferenciaAzteca || 0);
+      sTrB = parseFloat(ultimoResetBancos.saldoFinalTransferenciaBbva || 0);
+      sTrM = parseFloat(ultimoResetBancos.saldoFinalTransferenciaMp || 0);
+    }
+
+    const sTT = sTA + sTB + sTM;
+    const sTrT = sTrA + sTrB + sTrM;
+    const saldoInicialTotal = efectivo + sTT + sTrT;
 
     // Crear registro de saldo inicial (sin hora específica)
-    // Distribuir tarjeta entre los bancos (por defecto todo en Azteca, se puede ajustar después)
     await prisma.corteCaja.create({
       data: {
         fecha: new Date(),
         hora: null,
         saldoInicial: saldoInicialTotal,
         saldoInicialEfectivo: efectivo,
-        saldoInicialTarjetaAzteca: tarjeta, // Por defecto, todo el saldo de tarjeta va a Azteca
-        saldoInicialTarjetaBbva: 0,
-        saldoInicialTarjetaMp: 0,
-        saldoInicialTransferencia: transferencia,
+        saldoInicialTarjetaAzteca: sTA,
+        saldoInicialTarjetaBbva: sTB,
+        saldoInicialTarjetaMp: sTM,
+        saldoInicialTransferencia: sTrT,
         ventasEfectivo: 0,
         ventasTarjeta: 0,
         ventasTransferencia: 0,
@@ -732,13 +757,13 @@ const guardarSaldoInicial = async (req, res) => {
         totalVentas: 0,
         saldoFinal: saldoInicialTotal,
         saldoFinalEfectivo: efectivo,
-        saldoFinalTarjetaAzteca: tarjeta,
-        saldoFinalTarjetaBbva: 0,
-        saldoFinalTarjetaMp: 0,
-        saldoFinalTransferencia: transferencia,
-        saldoFinalTransferenciaAzteca: transferencia,
-        saldoFinalTransferenciaBbva: 0,
-        saldoFinalTransferenciaMp: 0,
+        saldoFinalTarjetaAzteca: sTA,
+        saldoFinalTarjetaBbva: sTB,
+        saldoFinalTarjetaMp: sTM,
+        saldoFinalTransferencia: sTrT,
+        saldoFinalTransferenciaAzteca: sTrA,
+        saldoFinalTransferenciaBbva: sTrB,
+        saldoFinalTransferenciaMp: sTrM,
         diferencia: 0,
         observaciones: null,
         usuarioId: req.session.user?.id || null,
@@ -750,7 +775,7 @@ const guardarSaldoInicial = async (req, res) => {
     console.error('Error al guardar saldo inicial:', error);
     // Mostrar mensaje de error más específico
     let mensajeError = 'Error al guardar saldo inicial';
-    
+
     // Mensajes de error más específicos según el tipo de error
     if (error.code === 'P2002') {
       mensajeError = 'Ya existe un registro con estos datos';
@@ -759,7 +784,7 @@ const guardarSaldoInicial = async (req, res) => {
     } else if (error.message) {
       mensajeError = error.message;
     }
-    
+
     res.status(500).json({ error: mensajeError });
   }
 };
@@ -787,18 +812,18 @@ const getBanco = (v) => {
 const mostrarCorte = async (req, res) => {
   try {
     const { hora } = req.query;
-    
+
     // Si no viene hora, redirigir al POS
     if (!hora) {
       return res.redirect('/pos');
     }
-    
+
     // Validar formato de hora (HH:MM) - permitir cualquier hora, no solo las configuradas
     const horaRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     if (!horaRegex.test(hora)) {
       return res.redirect('/pos');
     }
-    
+
     // Verificar que haya saldo inicial antes de permitir hacer un corte
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
@@ -808,16 +833,16 @@ const mostrarCorte = async (req, res) => {
         hora: null,
       },
     });
-    
+
     // Si no hay saldo inicial, redirigir al POS para que lo ingrese primero
     if (!saldoInicialHoy) {
       return res.redirect('/pos?necesitaSaldoInicial=true');
     }
-    
+
     // Obtener configuración de cortes para verificar si es el segundo corte (fin día)
     const configCortes = await getConfiguracionCortes();
     const esFinDia = hora === configCortes.horaCorte2;
-    
+
     // Buscar el saldo inicial del día o el último corte
     const saldoInicialDelDia = await prisma.corteCaja.findFirst({
       where: {
@@ -825,7 +850,7 @@ const mostrarCorte = async (req, res) => {
         hora: null,
       },
     });
-    
+
     const ultimoCorte = await prisma.corteCaja.findFirst({
       where: {
         fecha: { gte: hoy, lte: mañana },
@@ -833,12 +858,12 @@ const mostrarCorte = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     // Determinar desde cuándo contar las ventas
     let desdeFecha;
     let saldoInicial;
     let saldoInicialEfectivo;
-    
+
     if (ultimoCorte) {
       desdeFecha = ultimoCorte.createdAt;
       saldoInicial = parseFloat(ultimoCorte.saldoFinal);
@@ -871,7 +896,7 @@ const mostrarCorte = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Obtener gastos del período
     const gastos = await prisma.gasto.findMany({
       where: {
@@ -886,13 +911,13 @@ const mostrarCorte = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Agrupar ventas por doctor
     const ventasPorDoctor = {};
     ventas.forEach(v => {
       const doctorId = v.doctorId || 0;
       const doctorNombre = v.doctor ? `${v.doctor.nombre} ${v.doctor.apellido}` : 'Sin Doctor';
-      
+
       if (!ventasPorDoctor[doctorId]) {
         ventasPorDoctor[doctorId] = {
           doctorId,
@@ -912,11 +937,11 @@ const mostrarCorte = async (req, res) => {
           },
         };
       }
-      
+
       const total = parseFloat(v.total);
       const metodoBase = getMetodoBase(v.metodoPago);
       const bancoVenta = getBanco(v);
-      
+
       if (metodoBase === 'efectivo') {
         ventasPorDoctor[doctorId].efectivo += total;
       } else if (metodoBase === 'tarjeta') {
@@ -931,9 +956,9 @@ const mostrarCorte = async (req, res) => {
         }
       }
     });
-    
+
     // Convertir a array y ordenar por nombre de doctor
-    const ventasPorDoctorArray = Object.values(ventasPorDoctor).sort((a, b) => 
+    const ventasPorDoctorArray = Object.values(ventasPorDoctor).sort((a, b) =>
       a.doctorNombre.localeCompare(b.doctorNombre)
     );
 
@@ -947,7 +972,7 @@ const mostrarCorte = async (req, res) => {
     const ventasTransferencia = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular ventas por banco - Tarjeta
     const ventasTarjetaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Azteca')
@@ -958,7 +983,7 @@ const mostrarCorte = async (req, res) => {
     const ventasTarjetaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular ventas por banco - Transferencia
     const ventasTransferenciaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Azteca')
@@ -969,21 +994,21 @@ const mostrarCorte = async (req, res) => {
     const ventasTransferenciaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     const totalVentas = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Separar retiros de otros gastos
     const retiros = gastos.filter(g => g.motivo === 'Retiro de efectivo' && g.metodoPago === 'efectivo');
     const otrosGastos = gastos.filter(g => !(g.motivo === 'Retiro de efectivo' && g.metodoPago === 'efectivo'));
-    
+
     // Calcular gastos en efectivo del período (incluyendo retiros)
     const gastosEfectivo = gastos
       .filter(g => g.metodoPago === 'efectivo')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular total de retiros
     const totalRetiros = retiros.reduce((sum, r) => sum + parseFloat(r.monto), 0);
-    
+
     // Calcular saldo esperado: saldo inicial de efectivo + ventas en efectivo - gastos en efectivo
     const saldoEsperado = saldoInicialEfectivo + ventasEfectivo - gastosEfectivo;
 
@@ -1030,20 +1055,20 @@ const mostrarCorte = async (req, res) => {
 const procesarCorte = async (req, res) => {
   try {
     const { hora, saldoFinal, observaciones } = req.body;
-    
+
     // Validar formato de hora (HH:MM)
     const horaRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
     if (!horaRegex.test(hora)) {
       return res.status(400).json({ error: 'Formato de hora inválido. Use HH:MM (ejemplo: 14:00)' });
     }
-    
+
     // Obtener configuración de cortes para verificar si es el segundo corte (fin día)
     const configCortes = await getConfiguracionCortes();
     const esFinDia = hora === configCortes.horaCorte2;
 
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
+
     // Verificar si ya existe un corte a esta hora
     const corteExistente = await prisma.corteCaja.findFirst({
       where: {
@@ -1053,81 +1078,72 @@ const procesarCorte = async (req, res) => {
     });
 
     if (corteExistente) {
-      return res.status(400).json({ 
-        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa "Corte Manual" con una hora diferente.' 
+      return res.status(400).json({
+        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa "Corte Manual" con una hora diferente.'
       });
     }
 
-    // Buscar el saldo inicial del día o el último corte
-    const saldoInicialDelDia = await prisma.corteCaja.findFirst({
+    // --- Lógica de Reseteo Independiente para Corte General (MULTIDÍA) ---
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
       where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: null,
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-    });
-    
-    const ultimoCorte = await prisma.corteCaja.findFirst({
-      where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    
-    // Determinar desde cuándo contar las ventas y el saldo inicial
-    let desdeFecha;
-    let saldoInicial;
-    let saldoInicialEfectivo = 0;
-    let saldoInicialTarjetaAzteca = 0;
-    let saldoInicialTarjetaBbva = 0;
-    let saldoInicialTarjetaMp = 0;
-    let saldoInicialTransferencia = 0;
-    
-    if (ultimoCorte) {
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicial = parseFloat(ultimoCorte.saldoFinal);
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoInicialTransferencia = parseFloat(ultimoCorte.saldoFinalTransferencia || 0);
-    } else if (saldoInicialDelDia) {
-      desdeFecha = saldoInicialDelDia.createdAt;
-      saldoInicial = parseFloat(saldoInicialDelDia.saldoInicial);
-      saldoInicialEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-      saldoInicialTarjetaAzteca = parseFloat(saldoInicialDelDia.saldoInicialTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(saldoInicialDelDia.saldoInicialTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
-      saldoInicialTransferencia = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
-    } else {
-      // No hay saldo inicial ni cortes, usar inicio del día con saldo inicial 0
-      desdeFecha = hoy;
-      saldoInicial = 0;
-    }
-
-    // Obtener ventas desde el último corte o saldo inicial
-    const ventas = await prisma.venta.findMany({
-      where: {
-        createdAt: { gte: desdeFecha },
-      },
-      select: {
-        total: true,
-        metodoPago: true,
-        banco: true,
-      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Obtener gastos del período
-    const gastos = await prisma.gasto.findMany({
+    const ultimoResetBancos = await prisma.corteCaja.findFirst({
       where: {
-        createdAt: { gte: desdeFecha },
+        OR: [
+          { AND: [{ hora: { not: null } }, { OR: [{ ventasTarjeta: { gt: 0 } }, { ventasTransferencia: { gt: 0 } }] }] },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: 0 }] },
+          { AND: [{ hora: null }, { OR: [{ saldoInicialTarjetaAzteca: { gt: 0 } }, { saldoInicialTarjetaBbva: { gt: 0 } }, { saldoInicialTarjetaMp: { gt: 0 } }, { saldoInicialTransferencia: { gt: 0 } }] }] }
+        ]
       },
-      select: {
-        monto: true,
-        metodoPago: true,
-        banco: true,
-      },
+      orderBy: { createdAt: 'desc' }
     });
+
+    const desdeFechaEfectivo = ultimoResetEfectivo ? ultimoResetEfectivo.createdAt : hoy;
+    const desdeFechaBancos = ultimoResetBancos ? ultimoResetBancos.createdAt : new Date(0);
+
+    // Obtener ventas por separado
+    const ventasEfectivoLista = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { total: true }
+    });
+    const ventasBancosLista = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaBancos }, metodoPago: { in: ['tarjeta', 'transferencia'] } },
+      select: { total: true, metodoPago: true, banco: true }
+    });
+
+    // Obtener gastos por separado
+    const gastosEfectivoLista = await prisma.gasto.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { monto: true }
+    });
+    const gastosBancosLista = await prisma.gasto.findMany({
+      where: { createdAt: { gte: desdeFechaBancos }, metodoPago: { in: ['tarjeta', 'transferencia'] } },
+      select: { monto: true, metodoPago: true, banco: true }
+    });
+
+    const saldoInicialEfectivo = ultimoResetEfectivo ? parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0) : 0;
+    const saldoInicialTarjetaAzteca = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || 0) : 0;
+    const saldoInicialTarjetaBbva = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || 0) : 0;
+    const saldoInicialTarjetaMp = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || 0) : 0;
+    const saldoInicialTransferencia = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTransferencia || 0) : 0;
+
+    // Unir para compatibilidad con código existente
+    const ventas = [
+      ...ventasEfectivoLista.map(v => ({ ...v, metodoPago: 'efectivo' })),
+      ...ventasBancosLista
+    ];
+    const gastos = [
+      ...gastosEfectivoLista.map(g => ({ ...g, metodoPago: 'efectivo' })),
+      ...gastosBancosLista
+    ];
 
     // Calcular totales (saldoInicial ya fue asignado arriba)
     const ventasEfectivo = ventas
@@ -1140,12 +1156,12 @@ const procesarCorte = async (req, res) => {
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
     const totalVentas = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular gastos en efectivo del período
     const gastosEfectivo = gastos
       .filter(g => g.metodoPago === 'efectivo')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular gastos por banco - Tarjeta
     const gastosTarjetaAzteca = gastos
       .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Azteca')
@@ -1156,7 +1172,7 @@ const procesarCorte = async (req, res) => {
     const gastosTarjetaMp = gastos
       .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Mercado Pago')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular gastos por banco - Transferencia
     const gastosTransferenciaAzteca = gastos
       .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Azteca')
@@ -1167,7 +1183,7 @@ const procesarCorte = async (req, res) => {
     const gastosTransferenciaMp = gastos
       .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Mercado Pago')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     const saldoFinalCalculado = parseFloat(saldoFinal);
     // Calcular diferencia: saldo final - (saldo inicial de efectivo + ventas en efectivo - gastos en efectivo)
     const diferencia = saldoFinalCalculado - (saldoInicialEfectivo + ventasEfectivo - gastosEfectivo);
@@ -1182,7 +1198,7 @@ const procesarCorte = async (req, res) => {
     const ventasTarjetaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular ventas por banco - Transferencia
     const ventasTransferenciaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Azteca')
@@ -1241,12 +1257,12 @@ const procesarCorte = async (req, res) => {
 
     // Después de CUALQUIER corte, se debe solicitar saldo inicial inmediatamente
     // Si es fin de día (corte de las 6pm), también mostrar opción de fin día
-    
+
     // Obtener saldo final de efectivo después del corte
     const saldoFinalEfectivoDespuesCorte = parseFloat(saldoFinalCalculado);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       requiereSaldoInicial: true,
       esFinDia: esFinDia,
       saldoFinalEfectivo: saldoFinalEfectivoDespuesCorte,
@@ -1262,7 +1278,7 @@ const procesarCorte = async (req, res) => {
 const verificarPasswordAdmin = async (req, res) => {
   try {
     const { password } = req.body;
-    
+
     if (!password) {
       return res.status(400).json({ error: 'Contraseña requerida' });
     }
@@ -1281,7 +1297,7 @@ const verificarPasswordAdmin = async (req, res) => {
 
     // Verificar contraseña
     const isValid = await bcrypt.compare(password, admin.password);
-    
+
     if (!isValid) {
       return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
@@ -1298,7 +1314,7 @@ const mostrarCorteManual = async (req, res) => {
   try {
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
+
     // Buscar el último corte del día (si existe)
     const ultimoCorte = await prisma.corteCaja.findFirst({
       where: {
@@ -1307,7 +1323,7 @@ const mostrarCorteManual = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     // Buscar el saldo inicial más reciente (después del último corte si existe)
     let saldoInicialDelDia;
     if (ultimoCorte) {
@@ -1330,14 +1346,14 @@ const mostrarCorteManual = async (req, res) => {
         orderBy: { createdAt: 'desc' },
       });
     }
-    
+
     // Si no hay saldo inicial después del último corte, pero hay un último corte,
     // usar el saldo final del último corte como referencia temporal
     // Esto permite hacer el corte, y después se pedirá el nuevo saldo inicial
     let desdeFecha;
     let saldoInicial;
     let saldoInicialEfectivo, saldoInicialTarjetaAzteca, saldoInicialTarjetaBbva, saldoInicialTarjetaMp, saldoInicialTransferencia;
-    
+
     if (!saldoInicialDelDia && ultimoCorte) {
       // No hay saldo inicial después del último corte, usar el saldo final del último corte como referencia
       desdeFecha = ultimoCorte.createdAt;
@@ -1356,7 +1372,7 @@ const mostrarCorteManual = async (req, res) => {
       saldoInicialTarjetaMp = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
       saldoInicialTransferencia = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
       saldoInicial = saldoInicialEfectivo + saldoInicialTarjetaAzteca + saldoInicialTarjetaBbva + saldoInicialTarjetaMp + saldoInicialTransferencia;
-      
+
       // Si hay un corte después del saldo inicial, contar ventas desde ese corte
       if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
         desdeFecha = ultimoCorte.createdAt;
@@ -1383,7 +1399,7 @@ const mostrarCorteManual = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Obtener gastos del período
     const gastos = await prisma.gasto.findMany({
       where: {
@@ -1398,13 +1414,13 @@ const mostrarCorteManual = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Agrupar ventas por doctor
     const ventasPorDoctor = {};
     ventas.forEach(v => {
       const doctorId = v.doctorId || 0;
       const doctorNombre = v.doctor ? `${v.doctor.nombre} ${v.doctor.apellido}` : 'Sin Doctor';
-      
+
       if (!ventasPorDoctor[doctorId]) {
         ventasPorDoctor[doctorId] = {
           doctorId,
@@ -1424,11 +1440,11 @@ const mostrarCorteManual = async (req, res) => {
           },
         };
       }
-      
+
       const total = parseFloat(v.total);
       const metodoBase = getMetodoBase(v.metodoPago);
       const bancoVenta = getBanco(v);
-      
+
       if (metodoBase === 'efectivo') {
         ventasPorDoctor[doctorId].efectivo += total;
       } else if (metodoBase === 'tarjeta') {
@@ -1443,9 +1459,9 @@ const mostrarCorteManual = async (req, res) => {
         }
       }
     });
-    
+
     // Convertir a array y ordenar por nombre de doctor
-    const ventasPorDoctorArray = Object.values(ventasPorDoctor).sort((a, b) => 
+    const ventasPorDoctorArray = Object.values(ventasPorDoctor).sort((a, b) =>
       a.doctorNombre.localeCompare(b.doctorNombre)
     );
 
@@ -1459,7 +1475,7 @@ const mostrarCorteManual = async (req, res) => {
     const ventasTransferencia = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular ventas por banco - Tarjeta
     const ventasTarjetaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Azteca')
@@ -1470,7 +1486,7 @@ const mostrarCorteManual = async (req, res) => {
     const ventasTarjetaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular ventas por banco - Transferencia
     const ventasTransferenciaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Azteca')
@@ -1481,21 +1497,21 @@ const mostrarCorteManual = async (req, res) => {
     const ventasTransferenciaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     const totalVentas = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Separar retiros de otros gastos
     const retiros = gastos.filter(g => g.motivo === 'Retiro de efectivo' && g.metodoPago === 'efectivo');
     const otrosGastos = gastos.filter(g => !(g.motivo === 'Retiro de efectivo' && g.metodoPago === 'efectivo'));
-    
+
     // Calcular gastos en efectivo del período (incluyendo retiros)
     const gastosEfectivo = gastos
       .filter(g => g.metodoPago === 'efectivo')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular total de retiros
     const totalRetiros = retiros.reduce((sum, r) => sum + parseFloat(r.monto), 0);
-    
+
     // Calcular saldo esperado: saldo inicial de efectivo + ventas en efectivo - gastos en efectivo
     const saldoEsperado = saldoInicialEfectivo + ventasEfectivo - gastosEfectivo;
 
@@ -1545,7 +1561,7 @@ const mostrarCorteManual = async (req, res) => {
 const procesarCorteManual = async (req, res) => {
   try {
     const { hora, saldoFinal, observaciones } = req.body;
-    
+
     if (!hora) {
       return res.status(400).json({ error: 'Hora requerida' });
     }
@@ -1562,7 +1578,7 @@ const procesarCorteManual = async (req, res) => {
 
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
+
     // Verificar si ya existe un corte a esta hora exacta HOY
     const corteExistente = await prisma.corteCaja.findFirst({
       where: {
@@ -1572,11 +1588,11 @@ const procesarCorteManual = async (req, res) => {
     });
 
     if (corteExistente) {
-      return res.status(400).json({ 
-        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa una hora diferente.' 
+      return res.status(400).json({
+        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa una hora diferente.'
       });
     }
-    
+
     // Buscar el último corte del día (si existe)
     const ultimoCorte = await prisma.corteCaja.findFirst({
       where: {
@@ -1585,87 +1601,64 @@ const procesarCorteManual = async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     // Buscar el saldo inicial más reciente (después del último corte si existe)
     let saldoInicialDelDia;
-    if (ultimoCorte) {
-      // Si hay un corte, buscar el saldo inicial creado DESPUÉS de ese corte
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt }, // Después del último corte
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      // Si no hay corte, buscar cualquier saldo inicial del día
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
-    
-    // Si no hay saldo inicial después del último corte, pero hay un último corte,
-    // usar el saldo final del último corte como referencia temporal
-    let desdeFecha;
-    let saldoInicial;
-    let saldoInicialEfectivoVal, saldoInicialTarjetaAztecaVal, saldoInicialTarjetaBbvaVal, saldoInicialTarjetaMpVal, saldoInicialTransferenciaVal;
-    let saldoInicialTransferenciaAztecaVal = 0, saldoInicialTransferenciaBbvaVal = 0, saldoInicialTransferenciaMpVal = 0;
-    
-    if (!saldoInicialDelDia && ultimoCorte) {
-      // No hay saldo inicial después del último corte, usar el saldo final del último corte como referencia
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivoVal = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      saldoInicialTarjetaAztecaVal = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoInicialTarjetaBbvaVal = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoInicialTarjetaMpVal = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoInicialTransferenciaVal = parseFloat(ultimoCorte.saldoFinalTransferencia || 0);
-      saldoInicialTransferenciaAztecaVal = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-      saldoInicialTransferenciaBbvaVal = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-      saldoInicialTransferenciaMpVal = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-      saldoInicial = saldoInicialEfectivoVal + saldoInicialTarjetaAztecaVal + saldoInicialTarjetaBbvaVal + saldoInicialTarjetaMpVal + saldoInicialTransferenciaVal;
-    } else if (saldoInicialDelDia) {
-      // Hay saldo inicial, usarlo
-      desdeFecha = saldoInicialDelDia.createdAt;
-      saldoInicialEfectivoVal = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-      saldoInicialTarjetaAztecaVal = parseFloat(saldoInicialDelDia.saldoInicialTarjetaAzteca || 0);
-      saldoInicialTarjetaBbvaVal = parseFloat(saldoInicialDelDia.saldoInicialTarjetaBbva || 0);
-      saldoInicialTarjetaMpVal = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
-      saldoInicialTransferenciaVal = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
-      // Para transferencia, si hay un corte previo, usar sus saldos finales por banco
-      if (ultimoCorte && ultimoCorte.createdAt < saldoInicialDelDia.createdAt) {
-        saldoInicialTransferenciaAztecaVal = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-        saldoInicialTransferenciaBbvaVal = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-        saldoInicialTransferenciaMpVal = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-      }
-      saldoInicial = saldoInicialEfectivoVal + saldoInicialTarjetaAztecaVal + saldoInicialTarjetaBbvaVal + saldoInicialTarjetaMpVal + saldoInicialTransferenciaVal;
-      
-      // Si hay un corte después del saldo inicial, contar ventas desde ese corte
-      if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
-        desdeFecha = ultimoCorte.createdAt;
-      }
-    } else {
-      // No hay saldo inicial ni corte, no se puede hacer el corte
-      return res.status(400).json({ error: 'No se encontró el saldo inicial del día. Debes ingresar el saldo inicial primero (puede ser $0.00).' });
-    }
-
-    // Obtener ventas desde el último corte o saldo inicial
-    const ventas = await prisma.venta.findMany({
+    // --- Lógica de Reseteo Independiente para Corte Manual (MULTIDÍA) ---
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
       where: {
-        createdAt: { gte: desdeFecha },
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-      select: {
-        total: true,
-        metodoPago: true,
-        banco: true,
-      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Obtener gastos del período
+    const ultimoResetBancos = await prisma.corteCaja.findFirst({
+      where: {
+        OR: [
+          { AND: [{ hora: { not: null } }, { OR: [{ ventasTarjeta: { gt: 0 } }, { ventasTransferencia: { gt: 0 } }] }] },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: 0 }] },
+          { AND: [{ hora: null }, { OR: [{ saldoInicialTarjetaAzteca: { gt: 0 } }, { saldoInicialTarjetaBbva: { gt: 0 } }, { saldoInicialTarjetaMp: { gt: 0 } }, { saldoInicialTransferencia: { gt: 0 } }] }] }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!ultimoResetEfectivo || !ultimoResetBancos) {
+      return res.status(400).json({ error: 'No se encontró el saldo inicial del día o el último reset.' });
+    }
+
+    const desdeFechaEfectivo = ultimoResetEfectivo.createdAt;
+    const desdeFechaBancos = ultimoResetBancos.createdAt;
+
+    // Obtener ventas por separado
+    const ventasEfectivoLista = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { total: true }
+    });
+    const ventasBancosLista = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaBancos }, metodoPago: { in: ['tarjeta', 'transferencia'] } },
+      select: { total: true, metodoPago: true, banco: true }
+    });
+
+    const saldoInicialEfectivoVal = parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0);
+    const saldoInicialTarjetaAztecaVal = parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || ultimoResetBancos.saldoInicialTarjetaAzteca || 0);
+    const saldoInicialTarjetaBbvaVal = parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || ultimoResetBancos.saldoInicialTarjetaBbva || 0);
+    const saldoInicialTarjetaMpVal = parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || ultimoResetBancos.saldoInicialTarjetaMp || 0);
+    const saldoInicialTransferenciaVal = parseFloat(ultimoResetBancos.saldoFinalTransferencia || 0);
+
+    const desdeFecha = desdeFechaEfectivo < desdeFechaBancos ? desdeFechaEfectivo : desdeFechaBancos; // Para compatibilidad de consultas posteriores
+
+    // Unir para compatibilidad
+    const ventas = [
+      ...ventasEfectivoLista.map(v => ({ ...v, metodoPago: 'efectivo' })),
+      ...ventasBancosLista
+    ];
+
+    // Obtener gastos del período combinados
     const gastos = await prisma.gasto.findMany({
       where: {
         createdAt: { gte: desdeFecha },
@@ -1688,7 +1681,7 @@ const procesarCorteManual = async (req, res) => {
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
     const totalVentas = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular gastos por banco - Tarjeta
     const gastosTarjetaAzteca = gastos
       .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Azteca')
@@ -1699,7 +1692,7 @@ const procesarCorteManual = async (req, res) => {
     const gastosTarjetaMp = gastos
       .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Mercado Pago')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular gastos por banco - Transferencia
     const gastosTransferenciaAzteca = gastos
       .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Azteca')
@@ -1710,7 +1703,7 @@ const procesarCorteManual = async (req, res) => {
     const gastosTransferenciaMp = gastos
       .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Mercado Pago')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular ventas por banco (solo para tarjeta)
     const ventasTarjetaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Azteca')
@@ -1721,7 +1714,7 @@ const procesarCorteManual = async (req, res) => {
     const ventasTarjetaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular ventas por banco - Transferencia
     const ventasTransferenciaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Azteca')
@@ -1732,10 +1725,10 @@ const procesarCorteManual = async (req, res) => {
     const ventasTransferenciaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     const saldoFinalCalculado = parseFloat(saldoFinal);
     const diferencia = saldoFinalCalculado - (saldoInicial + ventasEfectivo);
-    
+
     // Calcular saldos finales restando gastos por banco
     const saldoFinalTarjetaAzteca = saldoInicialTarjetaAztecaVal + ventasTarjetaAzteca - gastosTarjetaAzteca;
     const saldoFinalTarjetaBbva = saldoInicialTarjetaBbvaVal + ventasTarjetaBbva - gastosTarjetaBbva;
@@ -1785,10 +1778,10 @@ const procesarCorteManual = async (req, res) => {
 
     // Obtener saldo final de efectivo después del corte
     const saldoFinalEfectivoDespuesCorte = parseFloat(saldoFinalCalculado);
-    
+
     // Después de CUALQUIER corte, se debe solicitar saldo inicial inmediatamente
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       requiereSaldoInicial: true,
       esFinDia: false, // Los cortes manuales no son fin de día
       saldoFinalEfectivo: saldoFinalEfectivoDespuesCorte,
@@ -1806,311 +1799,111 @@ const obtenerSaldosActuales = async (req, res) => {
   try {
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
-    // Buscar el último corte del día (si existe)
-    const ultimoCorte = await prisma.corteCaja.findFirst({
-      where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null }, // Solo cortes, no saldos iniciales
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    
-    // Buscar el saldo inicial más reciente (después del último corte si existe)
-    let saldoInicialDelDia;
-    if (ultimoCorte) {
-      // Si hay un corte, buscar el saldo inicial creado DESPUÉS de ese corte
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt }, // Después del último corte
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      // Si no hay corte, buscar cualquier saldo inicial del día
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
-    
-    // Determinar desde cuándo contar las ventas y el saldo inicial
-    // USAR LA MISMA LÓGICA QUE mostrarCorteEfectivo
-    let desdeFecha;
-    let saldoInicialEfectivo = 0;
-    let saldoInicialTarjetaAzteca = 0;
-    let saldoInicialTarjetaBbva = 0;
-    let saldoInicialTarjetaMp = 0;
-    let saldoInicialTransferenciaAzteca = 0;
-    let saldoInicialTransferenciaBbva = 0;
-    let saldoInicialTransferenciaMp = 0;
-    
-    // Verificar si el último corte es un corte de efectivo
-    const esCorteEfectivo = ultimoCorte && 
-      (parseFloat(ultimoCorte.ventasEfectivo || 0) > 0 || parseFloat(ultimoCorte.saldoInicialEfectivo || 0) > 0) && 
-      parseFloat(ultimoCorte.ventasTarjeta || 0) === 0 && 
-      parseFloat(ultimoCorte.ventasTransferencia || 0) === 0;
-    
-    if (esCorteEfectivo && !saldoInicialDelDia) {
-      // El último corte es un corte de efectivo y no hay saldo inicial después
-      // Usar los saldos finales del corte
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-      saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-      saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-    } else if (!saldoInicialDelDia && ultimoCorte) {
-      // No hay saldo inicial después del último corte, usar los saldos finales del corte
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      // Para bancos, usar los saldos finales tal cual (ya están distribuidos correctamente)
-      saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-      saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-      saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-    } else if (saldoInicialDelDia) {
-      // Hay un saldo inicial - este es el punto de partida
-      // IMPORTANTE: Si hay un corte previo al saldo inicial, usar los saldos finales del corte como base
-      // y luego aplicar el saldo inicial si es más reciente
-      desdeFecha = saldoInicialDelDia.createdAt; // Contar ventas desde el saldo inicial
-      
-      // Si hay un corte previo al saldo inicial, usar los saldos finales del corte como base
-      if (ultimoCorte && ultimoCorte.createdAt < saldoInicialDelDia.createdAt) {
-        // El corte es anterior al saldo inicial
-        // Primero, establecer los saldos desde el saldo inicial (si tiene valores explícitos)
-        saldoInicialEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-        saldoInicialTarjetaAzteca = parseFloat(saldoInicialDelDia.saldoInicialTarjetaAzteca || 0);
-        saldoInicialTarjetaBbva = parseFloat(saldoInicialDelDia.saldoInicialTarjetaBbva || 0);
-        saldoInicialTarjetaMp = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
-        
-        // Para transferencia, si el saldo inicial tiene un valor total, distribuirlo
-        const totalTransferenciaInicial = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
-        // Si el saldo inicial de transferencia es 0, establecer todos los bancos en 0
-        if (totalTransferenciaInicial === 0) {
-          saldoInicialTransferenciaAzteca = 0;
-          saldoInicialTransferenciaBbva = 0;
-          saldoInicialTransferenciaMp = 0;
-        } else {
-          // Si hay un total de transferencia en el saldo inicial, distribuirlo proporcionalmente
-          // basado en los saldos finales del corte
-          const saldoFinalTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-          const saldoFinalTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-          const saldoFinalTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-          const totalTransferenciaCorte = saldoFinalTransferenciaAzteca + saldoFinalTransferenciaBbva + saldoFinalTransferenciaMp;
-          if (totalTransferenciaCorte > 0) {
-            saldoInicialTransferenciaAzteca = (saldoFinalTransferenciaAzteca / totalTransferenciaCorte) * totalTransferenciaInicial;
-            saldoInicialTransferenciaBbva = (saldoFinalTransferenciaBbva / totalTransferenciaCorte) * totalTransferenciaInicial;
-            saldoInicialTransferenciaMp = (saldoFinalTransferenciaMp / totalTransferenciaCorte) * totalTransferenciaInicial;
-          } else {
-            // Si no hay saldos en el corte, dividir por 3
-            saldoInicialTransferenciaAzteca = totalTransferenciaInicial / 3;
-            saldoInicialTransferenciaBbva = totalTransferenciaInicial / 3;
-            saldoInicialTransferenciaMp = totalTransferenciaInicial / 3;
-          }
-        }
-        
-        // Si todos los saldos iniciales son 0, significa que el usuario quiere resetear todo
-        // En ese caso, contar ventas desde el saldo inicial (no desde el corte)
-        const todosCeros = saldoInicialEfectivo === 0 && 
-                          saldoInicialTarjetaAzteca === 0 && 
-                          saldoInicialTarjetaBbva === 0 && 
-                          saldoInicialTarjetaMp === 0 &&
-                          saldoInicialTransferenciaAzteca === 0 &&
-                          saldoInicialTransferenciaBbva === 0 &&
-                          saldoInicialTransferenciaMp === 0;
-        
-        if (todosCeros) {
-          // El usuario quiere resetear todo a 0, contar ventas desde el saldo inicial
-          desdeFecha = saldoInicialDelDia.createdAt;
-        } else {
-          // El usuario estableció algunos saldos, usar los saldos finales del corte como base
-          // pero contar ventas desde el corte (no desde el saldo inicial)
-          desdeFecha = ultimoCorte.createdAt;
-        }
-      } else {
-        // No hay corte previo, usar los saldos iniciales directamente
-        saldoInicialEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-        saldoInicialTarjetaAzteca = parseFloat(saldoInicialDelDia.saldoInicialTarjetaAzteca || 0);
-        saldoInicialTarjetaBbva = parseFloat(saldoInicialDelDia.saldoInicialTarjetaBbva || 0);
-        saldoInicialTarjetaMp = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
-        
-        // Para transferencia, dividir el total por 3 bancos
-        const totalTransferencia = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
-        saldoInicialTransferenciaAzteca = totalTransferencia / 3;
-        saldoInicialTransferenciaBbva = totalTransferencia / 3;
-        saldoInicialTransferenciaMp = totalTransferencia / 3;
-      }
-    } else if (ultimoCorte) {
-      // No hay saldo inicial, pero hay un corte - usar los saldos finales del corte
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-      saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-      saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-    } else {
-      // No hay saldo inicial ni corte, NO mostrar ventas acumuladas
-      // Solo mostrar $0 hasta que se ingrese un saldo inicial
-      desdeFecha = new Date(); // Usar fecha actual para que no cuente ventas pasadas
-      saldoInicialEfectivo = 0;
-      saldoInicialTarjetaAzteca = 0;
-      saldoInicialTarjetaBbva = 0;
-      saldoInicialTarjetaMp = 0;
-      saldoInicialTransferenciaAzteca = 0;
-      saldoInicialTransferenciaBbva = 0;
-      saldoInicialTransferenciaMp = 0;
-    }
 
-    // Obtener ventas desde el último corte o saldo inicial
-    // Si no hay saldo inicial ni corte, desdeFecha será la fecha actual, así que no habrá ventas
-    const ventas = await prisma.venta.findMany({
+    // --- Lógica de Reseteo Independiente ---
+
+    // 1. Encontrar el punto de partida para EFECTIVO
+    // Es el último registro que haya procesado efectivo (Manual, Efectivo o Saldo Inicial)
+    // --- Lógica de Reseteo Independiente (MULTIDÍA) ---
+    // 1. Encontrar el punto de partida para EFECTIVO
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
       where: {
-        createdAt: { gte: desdeFecha },
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-      select: {
-        total: true,
-        metodoPago: true,
-        banco: true,
-      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Obtener gastos del período
-    const gastos = await prisma.gasto.findMany({
+    // 2. Encontrar el punto de partida para BANCOS
+    const ultimoResetBancos = await prisma.corteCaja.findFirst({
       where: {
-        createdAt: { gte: desdeFecha },
+        OR: [
+          { AND: [{ hora: { not: null } }, { OR: [{ ventasTarjeta: { gt: 0 } }, { ventasTransferencia: { gt: 0 } }] }] },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: 0 }] },
+          { AND: [{ hora: null }, { OR: [{ saldoInicialTarjetaAzteca: { gt: 0 } }, { saldoInicialTarjetaBbva: { gt: 0 } }, { saldoInicialTarjetaMp: { gt: 0 } }, { saldoInicialTransferencia: { gt: 0 } }] }] }
+        ]
       },
-      select: {
-        monto: true,
-        metodoPago: true,
-        banco: true,
-      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Calcular ventas por banco - Tarjeta
-    const ventasTarjetaAzteca = ventas
-      .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Azteca')
-      .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    const ventasTarjetaBbva = ventas
-      .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'BBVA')
-      .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    const ventasTarjetaMp = ventas
-      .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Mercado Pago')
-      .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
-    // Calcular ventas por banco - Transferencia
-    const ventasTransferenciaAzteca = ventas
-      .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Azteca')
-      .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    const ventasTransferenciaBbva = ventas
-      .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'BBVA')
-      .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    const ventasTransferenciaMp = ventas
-      .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Mercado Pago')
-      .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
-    // Calcular gastos por banco - Tarjeta
-    const gastosTarjetaAzteca = gastos
-      .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Azteca')
-      .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    const gastosTarjetaBbva = gastos
-      .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'BBVA')
-      .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    const gastosTarjetaMp = gastos
-      .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Mercado Pago')
-      .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
-    // Calcular gastos por banco - Transferencia
-    const gastosTransferenciaAzteca = gastos
-      .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Azteca')
-      .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    const gastosTransferenciaBbva = gastos
-      .filter(g => g.metodoPago === 'transferencia' && g.banco === 'BBVA')
-      .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    const gastosTransferenciaMp = gastos
-      .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Mercado Pago')
-      .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
-    // Calcular ventas en efectivo
-    // Usar el mismo filtro que en mostrarCorteEfectivo: metodoPago === 'efectivo' directamente
-    const ventasEfectivo = ventas
-      .filter(v => {
-        const metodo = v.metodoPago ? v.metodoPago.toLowerCase() : 'efectivo';
-        return metodo === 'efectivo';
-      })
-      .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
-    // Calcular gastos en efectivo
-    const gastosEfectivo = gastos
-      .filter(g => {
-        const metodo = g.metodoPago ? g.metodoPago.toLowerCase() : 'efectivo';
-        return metodo === 'efectivo';
-      })
-      .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
-    // Verificar si el último corte es un corte de bancos
-    const esCorteBancos = ultimoCorte && 
-      (parseFloat(ultimoCorte.ventasTarjeta || 0) > 0 || parseFloat(ultimoCorte.ventasTransferencia || 0) > 0) &&
-      parseFloat(ultimoCorte.ventasEfectivo || 0) === 0;
-    
-    // Calcular saldos finales por banco (suma de tarjeta + transferencia)
-    // Si el último corte es un corte de bancos, los saldos finales de tarjeta ya incluyen el total
-    // (porque el usuario ingresó el total y lo guardamos en saldoFinalTarjetaAzteca)
-    let saldoFinalAzteca, saldoFinalBbva, saldoFinalMp;
-    
-    // Siempre sumar tarjeta + transferencia para obtener el total por banco
-    saldoFinalAzteca = (saldoInicialTarjetaAzteca + ventasTarjetaAzteca - gastosTarjetaAzteca) +
-                        (saldoInicialTransferenciaAzteca + ventasTransferenciaAzteca - gastosTransferenciaAzteca);
-    saldoFinalBbva = (saldoInicialTarjetaBbva + ventasTarjetaBbva - gastosTarjetaBbva) +
-                     (saldoInicialTransferenciaBbva + ventasTransferenciaBbva - gastosTransferenciaBbva);
-    saldoFinalMp = (saldoInicialTarjetaMp + ventasTarjetaMp - gastosTarjetaMp) +
-                   (saldoInicialTransferenciaMp + ventasTransferenciaMp - gastosTransferenciaMp);
-    
-    // Saldo final de efectivo
-    const saldoFinalEfectivo = saldoInicialEfectivo + ventasEfectivo - gastosEfectivo;
-    
-    // Logging detallado para depuración
-    console.log('=== OBTENER SALDOS ACTUALES ===');
-    console.log('Ultimo corte:', ultimoCorte ? { id: ultimoCorte.id, hora: ultimoCorte.hora, createdAt: ultimoCorte.createdAt, saldoFinalEfectivo: ultimoCorte.saldoFinalEfectivo } : 'null');
-    console.log('Saldo inicial del día:', saldoInicialDelDia ? { id: saldoInicialDelDia.id, createdAt: saldoInicialDelDia.createdAt, saldoInicialEfectivo: saldoInicialDelDia.saldoInicialEfectivo, saldoInicialTarjetaAzteca: saldoInicialDelDia.saldoInicialTarjetaAzteca, saldoInicialTarjetaMp: saldoInicialDelDia.saldoInicialTarjetaMp } : 'null');
-    console.log('Desde fecha:', desdeFecha);
-    console.log('Saldo inicial efectivo:', saldoInicialEfectivo);
-    console.log('Saldo inicial tarjeta Azteca:', saldoInicialTarjetaAzteca);
-    console.log('Saldo inicial tarjeta MP:', saldoInicialTarjetaMp);
-    console.log('Saldo inicial transferencia Azteca:', saldoInicialTransferenciaAzteca);
-    console.log('Saldo inicial transferencia MP:', saldoInicialTransferenciaMp);
-    console.log('Ventas efectivo:', ventasEfectivo);
-    console.log('Gastos efectivo:', gastosEfectivo);
-    console.log('Saldo final efectivo:', saldoFinalEfectivo);
-    console.log('Cantidad de ventas:', ventas.length);
-    console.log('Cantidad de gastos:', gastos.length);
-    console.log('Ventas por banco - Azteca:', ventasTarjetaAzteca + ventasTransferenciaAzteca);
-    console.log('Ventas por banco - BBVA:', ventasTarjetaBbva + ventasTransferenciaBbva);
-    console.log('Ventas por banco - MP:', ventasTarjetaMp + ventasTransferenciaMp);
-    console.log('Saldo final Azteca calculado:', saldoFinalAzteca);
-    console.log('Saldo final MP calculado:', saldoFinalMp);
-    
+    const desdeFechaEfectivo = ultimoResetEfectivo ? ultimoResetEfectivo.createdAt : hoy;
+    const desdeFechaBancos = ultimoResetBancos ? ultimoResetBancos.createdAt : new Date(0);
+
+    // --- Cálculos de EFECTIVO ---
+    let saldoInicialEfectivo = ultimoResetEfectivo ? parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0) : 0;
+
+    const ventasEfectivoLista = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { total: true }
+    });
+    const gastosEfectivoLista = await prisma.gasto.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { monto: true }
+    });
+
+    const sumVentasEfectivo = ventasEfectivoLista.reduce((sum, v) => sum + parseFloat(v.total), 0);
+    const sumGastosEfectivo = gastosEfectivoLista.reduce((sum, g) => sum + parseFloat(g.monto), 0);
+    const saldoFinalEfectivo = saldoInicialEfectivo + sumVentasEfectivo - sumGastosEfectivo;
+
+    // --- Cálculos de BANCOS ---
+    let saldoInicialAzteca = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || ultimoResetBancos.saldoFinalTransferenciaAzteca || ultimoResetBancos.saldoInicialTarjetaAzteca || 0) : 0;
+    let saldoInicialBbva = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || ultimoResetBancos.saldoFinalTransferenciaBbva || ultimoResetBancos.saldoInicialTarjetaBbva || 0) : 0;
+    let saldoFinalMp = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || ultimoResetBancos.saldoFinalTransferenciaMp || ultimoResetBancos.saldoInicialTarjetaMp || 0) : 0;
+
+    // Nota: El modelo parece guardar saldos por banco unificados en algunos registros. 
+    // Usamos los campos saldoFinal... si existen, que son los más actualizados de ese reset.
+
+    const ventasBancosLista = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaBancos }, metodoPago: { in: ['tarjeta', 'transferencia'] } },
+      select: { total: true, metodoPago: true, banco: true }
+    });
+    const gastosBancosLista = await prisma.gasto.findMany({
+      where: { createdAt: { gte: desdeFechaBancos }, metodoPago: { in: ['tarjeta', 'transferencia'] } },
+      select: { monto: true, metodoPago: true, banco: true }
+    });
+
+    // Agrupar ventas y gastos por banco
+    const getBancoNormalizado = (obj) => {
+      const b = (obj.banco || '').toLowerCase();
+      if (b.includes('azteca')) return 'azteca';
+      if (b.includes('bbva')) return 'bbva';
+      if (b.includes('mercado') || b.includes('mp')) return 'mp';
+      return 'otros';
+    };
+
+    let vAzteca = 0, vBbva = 0, vMp = 0;
+    ventasBancosLista.forEach(v => {
+      const b = getBancoNormalizado(v);
+      if (b === 'azteca') vAzteca += parseFloat(v.total);
+      else if (b === 'bbva') vBbva += parseFloat(v.total);
+      else if (b === 'mp') vMp += parseFloat(v.total);
+    });
+
+    let gAzteca = 0, gBbva = 0, gMp = 0;
+    gastosBancosLista.forEach(g => {
+      const b = getBancoNormalizado(g);
+      if (b === 'azteca') gAzteca += parseFloat(g.monto);
+      else if (b === 'bbva') gBbva += parseFloat(g.monto);
+      else if (b === 'mp') gMp += parseFloat(g.monto);
+    });
+
+    const saldoFinalAzteca = (ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || 0) + parseFloat(ultimoResetBancos.saldoFinalTransferenciaAzteca || 0) : 0) + vAzteca - gAzteca;
+    const saldoFinalBbva = (ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || 0) + parseFloat(ultimoResetBancos.saldoFinalTransferenciaBbva || 0) : 0) + vBbva - gBbva;
+    const saldoFinalMercadoPago = (ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || 0) + parseFloat(ultimoResetBancos.saldoFinalTransferenciaMp || 0) : 0) + vMp - gMp;
+
     const respuesta = {
       success: true,
       saldos: {
         efectivo: saldoFinalEfectivo,
         azteca: saldoFinalAzteca,
         bbva: saldoFinalBbva,
-        mercadoPago: saldoFinalMp,
+        mercadoPago: saldoFinalMercadoPago,
       },
     };
-    
+
     console.log('Saldos actuales calculados:', respuesta);
     res.json(respuesta);
   } catch (error) {
@@ -2126,60 +1919,31 @@ const obtenerLimiteEfectivo = async (req, res) => {
     const configRetiros = await prisma.configuracionRetiros.findFirst({
       where: { activo: true },
     });
-    
+
     const montoMaximoEfectivo = configRetiros ? parseFloat(configRetiros.montoMaximoEfectivo) : 0;
-    
+
     // Obtener saldo actual de efectivo usando la misma lógica que obtenerSaldosActuales
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
-    const ultimoCorte = await prisma.corteCaja.findFirst({
+
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
       where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null },
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }
     });
-    
-    let saldoInicialDelDia;
-    if (ultimoCorte) {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+
+    if (!ultimoResetEfectivo) {
+      return res.json({ success: true, saldoActual: 0, limiteMaximo: montoMaximoEfectivo, necesitaRetiro: false });
     }
-    
-    let desdeFecha;
-    let saldoInicialEfectivo = 0;
-    
-    if (!saldoInicialDelDia && ultimoCorte) {
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-    } else if (saldoInicialDelDia) {
-      desdeFecha = saldoInicialDelDia.createdAt;
-      saldoInicialEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-      
-      if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
-        desdeFecha = ultimoCorte.createdAt;
-        saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      }
-    } else {
-      desdeFecha = hoy;
-      saldoInicialEfectivo = 0;
-    }
-    
+
+    const desdeFecha = ultimoResetEfectivo.createdAt;
+    const saldoInicialEfectivo = parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0);
+
     // Obtener ventas en efectivo desde la fecha base
     const ventas = await prisma.venta.findMany({
       where: {
@@ -2188,7 +1952,7 @@ const obtenerLimiteEfectivo = async (req, res) => {
       },
       select: { total: true },
     });
-    
+
     // Obtener gastos en efectivo desde la fecha base
     const gastos = await prisma.gasto.findMany({
       where: {
@@ -2197,14 +1961,14 @@ const obtenerLimiteEfectivo = async (req, res) => {
       },
       select: { monto: true },
     });
-    
+
     const ventasEfectivo = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
     const gastosEfectivo = gastos.reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // El saldo actual es: saldo inicial + ventas - gastos
     // Los retiros se registran como gastos, por lo que ya están incluidos en gastosEfectivo
     const saldoActualEfectivo = saldoInicialEfectivo + ventasEfectivo - gastosEfectivo;
-    
+
     res.json({
       success: true,
       saldoActual: saldoActualEfectivo,
@@ -2228,56 +1992,25 @@ const retirarEfectivo = async (req, res) => {
     }
 
     // Obtener saldo actual de efectivo
-    const hoy = moment().tz(config.timezone).startOf('day').toDate();
-    const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
-    const ultimoCorte = await prisma.corteCaja.findFirst({
+    // Obtener saldo actual de efectivo usando la misma lógica (MULTIDÍA)
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
       where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null },
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }
     });
-    
-    let saldoInicialDelDia;
-    if (ultimoCorte) {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+
+    if (!ultimoResetEfectivo) {
+      return res.status(400).json({ error: 'No se puede retirar sin un saldo inicial o corte previo.' });
     }
-    
-    let desdeFecha;
-    let saldoInicialEfectivo = 0;
-    
-    if (!saldoInicialDelDia && ultimoCorte) {
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-    } else if (saldoInicialDelDia) {
-      desdeFecha = saldoInicialDelDia.createdAt;
-      saldoInicialEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-      
-      if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
-        desdeFecha = ultimoCorte.createdAt;
-        saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      }
-    } else {
-      desdeFecha = hoy;
-      saldoInicialEfectivo = 0;
-    }
-    
+
+    const desdeFecha = ultimoResetEfectivo.createdAt;
+    const saldoInicialEfectivo = parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0);
+
     // Obtener ventas y gastos desde la fecha base
     const ventas = await prisma.venta.findMany({
       where: {
@@ -2286,7 +2019,7 @@ const retirarEfectivo = async (req, res) => {
       },
       select: { total: true },
     });
-    
+
     const gastos = await prisma.gasto.findMany({
       where: {
         createdAt: { gte: desdeFecha },
@@ -2294,11 +2027,11 @@ const retirarEfectivo = async (req, res) => {
       },
       select: { monto: true },
     });
-    
+
     const ventasEfectivo = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
     const gastosEfectivo = gastos.reduce((sum, g) => sum + parseFloat(g.monto), 0);
     const saldoActualEfectivo = saldoInicialEfectivo + ventasEfectivo - gastosEfectivo;
-    
+
     // Validar que haya suficiente efectivo
     if (cantidad > saldoActualEfectivo) {
       return res.status(400).json({ error: 'El monto supera el efectivo disponible en caja' });
@@ -2355,7 +2088,7 @@ const retirarEfectivo = async (req, res) => {
 const verificarPasswordUsuario = async (req, res) => {
   try {
     const { password } = req.body;
-    
+
     if (!password) {
       return res.status(400).json({ error: 'Contraseña requerida' });
     }
@@ -2375,7 +2108,7 @@ const verificarPasswordUsuario = async (req, res) => {
 
     // Verificar contraseña
     const isValid = await bcrypt.compare(password, usuario.password);
-    
+
     if (!isValid) {
       return res.status(401).json({ error: 'Contraseña incorrecta' });
     }
@@ -2392,69 +2125,35 @@ const mostrarCorteEfectivo = async (req, res) => {
   try {
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
-    // Buscar el último corte del día (si existe)
-    const ultimoCorte = await prisma.corteCaja.findFirst({
+
+    // --- Lógica de Reseteo Independiente para Efectivo ---
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
       where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null },
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }
     });
-    
-    // Buscar el saldo inicial más reciente
-    let saldoInicialDelDia;
-    if (ultimoCorte) {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
-    
-    let desdeFecha;
-    let saldoInicialEfectivo;
-    
-    // Verificar si el último corte es un corte de efectivo (solo tiene ventas en efectivo, no tiene ventas de tarjeta ni transferencia)
-    // Si es así, mostrar los datos de ese corte directamente
-    const esCorteEfectivo = ultimoCorte && 
-      (parseFloat(ultimoCorte.ventasEfectivo || 0) > 0 || parseFloat(ultimoCorte.saldoInicialEfectivo || 0) > 0) && 
-      parseFloat(ultimoCorte.ventasTarjeta || 0) === 0 && 
-      parseFloat(ultimoCorte.ventasTransferencia || 0) === 0;
-    
-    if (!saldoInicialDelDia && ultimoCorte) {
-      // No hay saldo inicial después del último corte, usar los saldos finales del corte
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-    } else if (saldoInicialDelDia) {
-      // Hay un saldo inicial - este es el punto de partida
-      desdeFecha = saldoInicialDelDia.createdAt;
-      saldoInicialEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-      
-      // Si el corte es más reciente que el saldo inicial, el corte resetea todo
-      // Si el saldo inicial es más reciente que el corte, el saldo inicial es el punto de partida
-      if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
-        // El corte es más reciente que el saldo inicial
-        // El corte resetea todo, usar los saldos finales del corte como punto de partida
-        desdeFecha = ultimoCorte.createdAt;
-        saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      }
-      // Si el saldo inicial es más reciente que el corte, ya está configurado arriba
-      // El saldo inicial es el punto de partida y las ventas se cuentan desde el saldo inicial
-    } else {
+
+    if (!ultimoResetEfectivo) {
       return res.redirect('/pos?necesitaSaldoInicial=true');
     }
+
+    const desdeFecha = ultimoResetEfectivo.createdAt;
+    const saldoInicialEfectivo = parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0);
+
+    // Buscar cualquier registro previo para referencia
+    const ultimoCorte = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: { not: null } },
+      orderBy: { createdAt: 'desc' }
+    });
+    const saldoInicialDelDia = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: null },
+      orderBy: { createdAt: 'desc' }
+    });
 
     // Obtener ventas en efectivo desde el último corte o saldo inicial
     const ventas = await prisma.venta.findMany({
@@ -2474,7 +2173,7 @@ const mostrarCorteEfectivo = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Obtener gastos en efectivo del período
     const gastos = await prisma.gasto.findMany({
       where: {
@@ -2490,17 +2189,17 @@ const mostrarCorteEfectivo = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Separar retiros de otros gastos
     const retiros = gastos.filter(g => g.motivo === 'Retiro de efectivo' && g.metodoPago === 'efectivo');
     const otrosGastos = gastos.filter(g => !(g.motivo === 'Retiro de efectivo' && g.metodoPago === 'efectivo'));
-    
+
     // Calcular totales
     const ventasEfectivo = ventas.reduce((sum, v) => sum + parseFloat(v.total), 0);
     const gastosEfectivo = gastos.reduce((sum, g) => sum + parseFloat(g.monto), 0);
     const totalRetiros = retiros.reduce((sum, r) => sum + parseFloat(r.monto), 0);
     const saldoEsperado = saldoInicialEfectivo + ventasEfectivo - gastosEfectivo;
-    
+
     // Logging detallado para depuración
     console.log('=== MOSTRAR CORTE EFECTIVO ===');
     console.log('Ultimo corte:', ultimoCorte ? { id: ultimoCorte.id, hora: ultimoCorte.hora, createdAt: ultimoCorte.createdAt, saldoFinalEfectivo: ultimoCorte.saldoFinalEfectivo } : 'null');
@@ -2514,7 +2213,7 @@ const mostrarCorteEfectivo = async (req, res) => {
     console.log('Cantidad de ventas:', ventas.length);
     console.log('Cantidad de gastos:', gastos.length);
     console.log('Cantidad de retiros:', retiros.length);
-    
+
     // Obtener hora actual
     const horaActual = moment().tz(config.timezone).format('HH:mm');
 
@@ -2563,7 +2262,7 @@ const mostrarCorteEfectivo = async (req, res) => {
 const procesarCorteEfectivo = async (req, res) => {
   try {
     const { hora, saldoFinal, observaciones } = req.body;
-    
+
     if (!hora) {
       return res.status(400).json({ error: 'Hora requerida' });
     }
@@ -2579,7 +2278,7 @@ const procesarCorteEfectivo = async (req, res) => {
 
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
+
     // Verificar si ya existe un corte de efectivo a esta hora exacta HOY
     const corteExistente = await prisma.corteCaja.findFirst({
       where: {
@@ -2589,58 +2288,39 @@ const procesarCorteEfectivo = async (req, res) => {
     });
 
     if (corteExistente) {
-      return res.status(400).json({ 
-        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa una hora diferente.' 
+      return res.status(400).json({
+        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa una hora diferente.'
       });
     }
-    
-    // Buscar el último corte del día
-    const ultimoCorte = await prisma.corteCaja.findFirst({
+
+    // --- Lógica de Reseteo Independiente para Efectivo ---
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
       where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null },
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }
     });
-    
-    // Buscar el saldo inicial más reciente
-    let saldoInicialDelDia;
-    if (ultimoCorte) {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+
+    if (!ultimoResetEfectivo) {
+      return res.status(400).json({ error: 'No se encontró el saldo inicial del día o el último reset de efectivo.' });
     }
-    
-    let desdeFecha;
-    let saldoInicialEfectivo;
-    
-    if (!saldoInicialDelDia && ultimoCorte) {
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-    } else if (saldoInicialDelDia) {
-      desdeFecha = saldoInicialDelDia.createdAt;
-      saldoInicialEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-      
-      if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
-        desdeFecha = ultimoCorte.createdAt;
-        saldoInicialEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-      }
-    } else {
-      return res.status(400).json({ error: 'No se encontró el saldo inicial del día. Debes ingresar el saldo inicial primero (puede ser $0.00).' });
-    }
+
+    const desdeFecha = ultimoResetEfectivo.createdAt;
+    const saldoInicialEfectivo = parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0);
+
+    // Buscar ultimo corte general para llevar saldos de bancos
+    const ultimoCorte = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: { not: null } },
+      orderBy: { createdAt: 'desc' }
+    });
+    const saldoInicialDelDia = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: null },
+      orderBy: { createdAt: 'desc' }
+    });
 
     // Obtener ventas en efectivo
     const ventas = await prisma.venta.findMany({
@@ -2669,39 +2349,75 @@ const procesarCorteEfectivo = async (req, res) => {
     const saldoFinalCalculado = parseFloat(saldoFinal);
     const diferencia = saldoFinalCalculado - (saldoInicialEfectivo + ventasEfectivo - gastosEfectivo);
 
-    // Obtener saldos actuales de bancos del último corte para mantenerlos
-    let saldoFinalTarjetaAzteca = 0, saldoFinalTarjetaBbva = 0, saldoFinalTarjetaMp = 0;
-    let saldoFinalTransferenciaAzteca = 0, saldoFinalTransferenciaBbva = 0, saldoFinalTransferenciaMp = 0;
-    
-    if (ultimoCorte) {
-      saldoFinalTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoFinalTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoFinalTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoFinalTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-      saldoFinalTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-      saldoFinalTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-    } else if (saldoInicialDelDia) {
-      saldoFinalTarjetaAzteca = parseFloat(saldoInicialDelDia.saldoInicialTarjetaAzteca || 0);
-      saldoFinalTarjetaBbva = parseFloat(saldoInicialDelDia.saldoInicialTarjetaBbva || 0);
-      saldoFinalTarjetaMp = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
-      // Si hay un último corte previo, usar sus saldos finales por banco
-      if (ultimoCorte && ultimoCorte.createdAt < saldoInicialDelDia.createdAt) {
-        saldoFinalTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-        saldoFinalTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-        saldoFinalTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
+    // --- Calcular saldos de bancos para el snapshot (MULTIDÍA) ---
+    const ultimoResetBancos = await prisma.corteCaja.findFirst({
+      where: {
+        OR: [
+          { AND: [{ hora: { not: null } }, { OR: [{ ventasTarjeta: { gt: 0 } }, { ventasTransferencia: { gt: 0 } }] }] },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: 0 }] },
+          { AND: [{ hora: null }, { OR: [{ saldoInicialTarjetaAzteca: { gt: 0 } }, { saldoInicialTarjetaBbva: { gt: 0 } }, { saldoInicialTarjetaMp: { gt: 0 } }, { saldoInicialTransferencia: { gt: 0 } }] }] }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const desdeFechaBancos = ultimoResetBancos ? ultimoResetBancos.createdAt : new Date(0);
+    const ventasBancosSnapshot = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaBancos }, metodoPago: { in: ['tarjeta', 'transferencia'] } },
+      select: { total: true, banco: true, metodoPago: true }
+    });
+    const gastosBancosSnapshot = await prisma.gasto.findMany({
+      where: { createdAt: { gte: desdeFechaBancos }, metodoPago: { in: ['tarjeta', 'transferencia'] } },
+      select: { monto: true, banco: true, metodoPago: true }
+    });
+
+    const getB = (obj) => {
+      const b = (obj.banco || '').toLowerCase();
+      if (b.includes('azteca')) return 'azteca';
+      if (b.includes('bbva')) return 'bbva';
+      if (b.includes('mercado') || b.includes('mp')) return 'mp';
+      return 'otros';
+    };
+
+    let saldoFinalTarjetaAzteca = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || 0) : 0;
+    let saldoFinalTarjetaBbva = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || 0) : 0;
+    let saldoFinalTarjetaMp = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || 0) : 0;
+    let saldoFinalTransferenciaAzteca = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTransferenciaAzteca || 0) : 0;
+    let saldoFinalTransferenciaBbva = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTransferenciaBbva || 0) : 0;
+    let saldoFinalTransferenciaMp = ultimoResetBancos ? parseFloat(ultimoResetBancos.saldoFinalTransferenciaMp || 0) : 0;
+
+    ventasBancosSnapshot.forEach(v => {
+      const b = getB(v);
+      const m = (v.metodoPago || '').toLowerCase();
+      if (m === 'tarjeta') {
+        if (b === 'azteca') saldoFinalTarjetaAzteca += parseFloat(v.total);
+        else if (b === 'bbva') saldoFinalTarjetaBbva += parseFloat(v.total);
+        else if (b === 'mp') saldoFinalTarjetaMp += parseFloat(v.total);
       } else {
-        // Si no hay último corte, dividir el total de transferencia por 3 como aproximación
-        const totalTransferencia = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
-        saldoFinalTransferenciaAzteca = totalTransferencia / 3;
-        saldoFinalTransferenciaBbva = totalTransferencia / 3;
-        saldoFinalTransferenciaMp = totalTransferencia / 3;
+        if (b === 'azteca') saldoFinalTransferenciaAzteca += parseFloat(v.total);
+        else if (b === 'bbva') saldoFinalTransferenciaBbva += parseFloat(v.total);
+        else if (b === 'mp') saldoFinalTransferenciaMp += parseFloat(v.total);
       }
-    }
+    });
+
+    gastosBancosSnapshot.forEach(g => {
+      const b = getB(g);
+      const m = (g.metodoPago || '').toLowerCase();
+      if (m === 'tarjeta') {
+        if (b === 'azteca') saldoFinalTarjetaAzteca -= parseFloat(g.monto);
+        else if (b === 'bbva') saldoFinalTarjetaBbva -= parseFloat(g.monto);
+        else if (b === 'mp') saldoFinalTarjetaMp -= parseFloat(g.monto);
+      } else {
+        if (b === 'azteca') saldoFinalTransferenciaAzteca -= parseFloat(g.monto);
+        else if (b === 'bbva') saldoFinalTransferenciaBbva -= parseFloat(g.monto);
+        else if (b === 'mp') saldoFinalTransferenciaMp -= parseFloat(g.monto);
+      }
+    });
 
     const saldoFinalTransferencia = saldoFinalTransferenciaAzteca + saldoFinalTransferenciaBbva + saldoFinalTransferenciaMp;
     const saldoFinalTotal = saldoFinalCalculado + saldoFinalTarjetaAzteca + saldoFinalTarjetaBbva + saldoFinalTarjetaMp + saldoFinalTransferencia;
 
-    // Crear corte de efectivo
+    // Crear corte de efectivo (VentasTarjeta y Transferencia se guardan como 0 para no resetear la acumulación)
     await prisma.corteCaja.create({
       data: {
         fecha: new Date(),
@@ -2713,7 +2429,7 @@ const procesarCorteEfectivo = async (req, res) => {
         saldoInicialTarjetaMp: 0,
         saldoInicialTransferencia: 0,
         ventasEfectivo: ventasEfectivo,
-        ventasTarjeta: 0,
+        ventasTarjeta: 0, // MARCADOR: No resetea acumulación de bancos
         ventasTransferencia: 0,
         ventasTarjetaAzteca: 0,
         ventasTarjetaBbva: 0,
@@ -2739,9 +2455,9 @@ const procesarCorteEfectivo = async (req, res) => {
 
     // Obtener saldo final de efectivo después del corte
     const saldoFinalEfectivoDespuesCorte = parseFloat(saldoFinalCalculado);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       requiereSaldoInicial: true,
       esFinDia: false,
       saldoFinalEfectivo: saldoFinalEfectivoDespuesCorte,
@@ -2758,106 +2474,50 @@ const mostrarCorteBancos = async (req, res) => {
   try {
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
-    // Buscar el último corte del día
-    const ultimoCorte = await prisma.corteCaja.findFirst({
+
+    // --- Lógica de Reseteo Independiente para Bancos ---
+    const ultimoResetBancos = await prisma.corteCaja.findFirst({
       where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null },
+        OR: [
+          { AND: [{ hora: { not: null } }, { OR: [{ ventasTarjeta: { gt: 0 } }, { ventasTransferencia: { gt: 0 } }] }] },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: 0 }] },
+          { AND: [{ hora: null }, { OR: [{ saldoInicialTarjetaAzteca: { gt: 0 } }, { saldoInicialTarjetaBbva: { gt: 0 } }, { saldoInicialTarjetaMp: { gt: 0 } }, { saldoInicialTransferencia: { gt: 0 } }] }] }
+        ]
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }
     });
-    
-    // Buscar el saldo inicial más reciente
-    let saldoInicialDelDia;
-    if (ultimoCorte) {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
-    
-    let desdeFecha;
-    let saldoInicialTarjetaAzteca, saldoInicialTarjetaBbva, saldoInicialTarjetaMp;
-    let saldoInicialTransferenciaAzteca, saldoInicialTransferenciaBbva, saldoInicialTransferenciaMp;
-    
-    if (!saldoInicialDelDia && ultimoCorte) {
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-      saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-      saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-    } else if (saldoInicialDelDia) {
-      desdeFecha = saldoInicialDelDia.createdAt;
-      
-      // Si el corte es más reciente que el saldo inicial, el corte resetea todo
-      if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
-        // El corte es más reciente que el saldo inicial
-        // El corte resetea todo, usar los saldos finales del corte como punto de partida
-        desdeFecha = ultimoCorte.createdAt;
-        saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-        saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-        saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-        saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-        saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-        saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-      } else {
-        // El saldo inicial es más reciente que el corte (o no hay corte)
-        // Usar los saldos iniciales de tarjeta del saldo inicial
-        saldoInicialTarjetaAzteca = parseFloat(saldoInicialDelDia.saldoInicialTarjetaAzteca || 0);
-        saldoInicialTarjetaBbva = parseFloat(saldoInicialDelDia.saldoInicialTarjetaBbva || 0);
-        saldoInicialTarjetaMp = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
-        
-        // Para transferencia, si el saldo inicial tiene un valor explícito (incluso si es 0), usarlo
-        const totalTransferencia = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
-        if (totalTransferencia === 0) {
-          // Si el saldo inicial de transferencia es 0, establecer todos los bancos en 0
-          saldoInicialTransferenciaAzteca = 0;
-          saldoInicialTransferenciaBbva = 0;
-          saldoInicialTransferenciaMp = 0;
-        } else {
-          // Si hay un total de transferencia en el saldo inicial, distribuirlo proporcionalmente
-          // basado en los saldos finales del corte (si existe)
-          if (ultimoCorte && ultimoCorte.createdAt < saldoInicialDelDia.createdAt) {
-            const saldoFinalTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-            const saldoFinalTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-            const saldoFinalTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-            const totalTransferenciaCorte = saldoFinalTransferenciaAzteca + saldoFinalTransferenciaBbva + saldoFinalTransferenciaMp;
-            if (totalTransferenciaCorte > 0) {
-              saldoInicialTransferenciaAzteca = (saldoFinalTransferenciaAzteca / totalTransferenciaCorte) * totalTransferencia;
-              saldoInicialTransferenciaBbva = (saldoFinalTransferenciaBbva / totalTransferenciaCorte) * totalTransferencia;
-              saldoInicialTransferenciaMp = (saldoFinalTransferenciaMp / totalTransferenciaCorte) * totalTransferencia;
-            } else {
-              // Si no hay saldos en el corte, dividir por 3
-              saldoInicialTransferenciaAzteca = totalTransferencia / 3;
-              saldoInicialTransferenciaBbva = totalTransferencia / 3;
-              saldoInicialTransferenciaMp = totalTransferencia / 3;
-            }
-          } else {
-            // Si no hay último corte, dividir el total de transferencia por 3 como aproximación
-            saldoInicialTransferenciaAzteca = totalTransferencia / 3;
-            saldoInicialTransferenciaBbva = totalTransferencia / 3;
-            saldoInicialTransferenciaMp = totalTransferencia / 3;
-          }
-        }
-      }
-    } else {
+
+    if (!ultimoResetBancos) {
       return res.redirect('/pos?necesitaSaldoInicial=true');
     }
+
+    const desdeFecha = ultimoResetBancos.createdAt;
+
+    let saldoInicialTarjetaAzteca = parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || ultimoResetBancos.saldoInicialTarjetaAzteca || 0);
+    let saldoInicialTarjetaBbva = parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || ultimoResetBancos.saldoInicialTarjetaBbva || 0);
+    let saldoInicialTarjetaMp = parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || ultimoResetBancos.saldoInicialTarjetaMp || 0);
+
+    let saldoInicialTransferenciaAzteca = parseFloat(ultimoResetBancos.saldoFinalTransferenciaAzteca || 0);
+    let saldoInicialTransferenciaBbva = parseFloat(ultimoResetBancos.saldoFinalTransferenciaBbva || 0);
+    let saldoInicialTransferenciaMp = parseFloat(ultimoResetBancos.saldoFinalTransferenciaMp || 0);
+
+    // Compatibilidad con saldos iniciales planos
+    if (ultimoResetBancos.hora === null && saldoInicialTransferenciaAzteca === 0 && parseFloat(ultimoResetBancos.saldoInicialTransferencia || 0) > 0) {
+      const t = parseFloat(ultimoResetBancos.saldoInicialTransferencia);
+      saldoInicialTransferenciaAzteca = t / 3;
+      saldoInicialTransferenciaBbva = t / 3;
+      saldoInicialTransferenciaMp = t / 3;
+    }
+
+    // Buscar ultimo corte general/saldo inicial para referencia
+    const ultimoCorte = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: { not: null } },
+      orderBy: { createdAt: 'desc' }
+    });
+    const saldoInicialDelDia = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: null },
+      orderBy: { createdAt: 'desc' }
+    });
 
     // Obtener ventas con tarjeta y transferencia
     const ventas = await prisma.venta.findMany({
@@ -2877,7 +2537,7 @@ const mostrarCorteBancos = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Obtener gastos con tarjeta y transferencia
     const gastos = await prisma.gasto.findMany({
       where: {
@@ -2893,7 +2553,7 @@ const mostrarCorteBancos = async (req, res) => {
       },
       orderBy: { createdAt: 'asc' },
     });
-    
+
     // Calcular ventas por banco - Tarjeta
     const ventasTarjetaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Azteca')
@@ -2904,7 +2564,7 @@ const mostrarCorteBancos = async (req, res) => {
     const ventasTarjetaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'tarjeta' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular ventas por banco - Transferencia
     const ventasTransferenciaAzteca = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Azteca')
@@ -2915,7 +2575,7 @@ const mostrarCorteBancos = async (req, res) => {
     const ventasTransferenciaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular gastos por banco - Tarjeta
     const gastosTarjetaAzteca = gastos
       .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Azteca')
@@ -2926,7 +2586,7 @@ const mostrarCorteBancos = async (req, res) => {
     const gastosTarjetaMp = gastos
       .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Mercado Pago')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular gastos por banco - Transferencia
     const gastosTransferenciaAzteca = gastos
       .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Azteca')
@@ -2937,15 +2597,15 @@ const mostrarCorteBancos = async (req, res) => {
     const gastosTransferenciaMp = gastos
       .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Mercado Pago')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular saldos esperados por banco
-    const saldoEsperadoAzteca = saldoInicialTarjetaAzteca + saldoInicialTransferenciaAzteca + 
+    const saldoEsperadoAzteca = saldoInicialTarjetaAzteca + saldoInicialTransferenciaAzteca +
       ventasTarjetaAzteca + ventasTransferenciaAzteca - gastosTarjetaAzteca - gastosTransferenciaAzteca;
-    const saldoEsperadoBbva = saldoInicialTarjetaBbva + saldoInicialTransferenciaBbva + 
+    const saldoEsperadoBbva = saldoInicialTarjetaBbva + saldoInicialTransferenciaBbva +
       ventasTarjetaBbva + ventasTransferenciaBbva - gastosTarjetaBbva - gastosTransferenciaBbva;
-    const saldoEsperadoMp = saldoInicialTarjetaMp + saldoInicialTransferenciaMp + 
+    const saldoEsperadoMp = saldoInicialTarjetaMp + saldoInicialTransferenciaMp +
       ventasTarjetaMp + ventasTransferenciaMp - gastosTarjetaMp - gastosTransferenciaMp;
-    
+
     const horaActual = moment().tz(config.timezone).format('HH:mm');
 
     res.render('pos/corte', {
@@ -3005,7 +2665,7 @@ const mostrarCorteBancos = async (req, res) => {
 const procesarCorteBancos = async (req, res) => {
   try {
     const { hora, saldoFinalAzteca, saldoFinalBbva, saldoFinalMp, observaciones } = req.body;
-    
+
     if (!hora) {
       return res.status(400).json({ error: 'Hora requerida' });
     }
@@ -3029,7 +2689,7 @@ const procesarCorteBancos = async (req, res) => {
 
     const hoy = moment().tz(config.timezone).startOf('day').toDate();
     const mañana = moment().tz(config.timezone).endOf('day').toDate();
-    
+
     // Verificar si ya existe un corte de bancos a esta hora exacta HOY
     const corteExistente = await prisma.corteCaja.findFirst({
       where: {
@@ -3039,84 +2699,46 @@ const procesarCorteBancos = async (req, res) => {
     });
 
     if (corteExistente) {
-      return res.status(400).json({ 
-        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa una hora diferente.' 
+      return res.status(400).json({
+        error: 'Ya se realizó un corte a las ' + hora + ' hoy. Si necesitas hacer otro corte, usa una hora diferente.'
       });
     }
-    
-    // Buscar el último corte del día
-    const ultimoCorte = await prisma.corteCaja.findFirst({
+
+    // --- Lógica de Reseteo Independiente para Bancos ---
+    const ultimoResetBancos = await prisma.corteCaja.findFirst({
       where: {
-        fecha: { gte: hoy, lte: mañana },
-        hora: { not: null },
+        OR: [
+          { AND: [{ hora: { not: null } }, { OR: [{ ventasTarjeta: { gt: 0 } }, { ventasTransferencia: { gt: 0 } }] }] },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: 0 }] },
+          { AND: [{ hora: null }, { OR: [{ saldoInicialTarjetaAzteca: { gt: 0 } }, { saldoInicialTarjetaBbva: { gt: 0 } }, { saldoInicialTarjetaMp: { gt: 0 } }, { saldoInicialTransferencia: { gt: 0 } }] }] }
+        ]
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }
     });
-    
-    // Buscar el saldo inicial más reciente
-    let saldoInicialDelDia;
-    if (ultimoCorte) {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-          createdAt: { gt: ultimoCorte.createdAt },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-    } else {
-      saldoInicialDelDia = await prisma.corteCaja.findFirst({
-        where: {
-          fecha: { gte: hoy, lte: mañana },
-          hora: null,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
+
+    if (!ultimoResetBancos) {
+      return res.status(400).json({ error: 'No se encontró el saldo inicial del día o el último reset de bancos.' });
     }
-    
-    let desdeFecha;
-    let saldoInicialTarjetaAzteca, saldoInicialTarjetaBbva, saldoInicialTarjetaMp;
-    let saldoInicialTransferenciaAzteca, saldoInicialTransferenciaBbva, saldoInicialTransferenciaMp;
-    
-    if (!saldoInicialDelDia && ultimoCorte) {
-      desdeFecha = ultimoCorte.createdAt;
-      saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-      saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-      saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-      saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-    } else if (saldoInicialDelDia) {
-      desdeFecha = saldoInicialDelDia.createdAt;
-      saldoInicialTarjetaAzteca = parseFloat(saldoInicialDelDia.saldoInicialTarjetaAzteca || 0);
-      saldoInicialTarjetaBbva = parseFloat(saldoInicialDelDia.saldoInicialTarjetaBbva || 0);
-      saldoInicialTarjetaMp = parseFloat(saldoInicialDelDia.saldoInicialTarjetaMp || 0);
-      
-      // Para transferencia, si hay un último corte, usar sus saldos finales por banco
-      if (ultimoCorte && ultimoCorte.createdAt < saldoInicialDelDia.createdAt) {
-        saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-        saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-        saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-      } else {
-        // Si no hay último corte, dividir el total de transferencia por 3 como aproximación
-        const totalTransferencia = parseFloat(saldoInicialDelDia.saldoInicialTransferencia || 0);
-        saldoInicialTransferenciaAzteca = totalTransferencia / 3;
-        saldoInicialTransferenciaBbva = totalTransferencia / 3;
-        saldoInicialTransferenciaMp = totalTransferencia / 3;
-      }
-      
-      if (ultimoCorte && ultimoCorte.createdAt > saldoInicialDelDia.createdAt) {
-        desdeFecha = ultimoCorte.createdAt;
-        saldoInicialTarjetaAzteca = parseFloat(ultimoCorte.saldoFinalTarjetaAzteca || 0);
-        saldoInicialTarjetaBbva = parseFloat(ultimoCorte.saldoFinalTarjetaBbva || 0);
-        saldoInicialTarjetaMp = parseFloat(ultimoCorte.saldoFinalTarjetaMp || 0);
-        saldoInicialTransferenciaAzteca = parseFloat(ultimoCorte.saldoFinalTransferenciaAzteca || 0);
-        saldoInicialTransferenciaBbva = parseFloat(ultimoCorte.saldoFinalTransferenciaBbva || 0);
-        saldoInicialTransferenciaMp = parseFloat(ultimoCorte.saldoFinalTransferenciaMp || 0);
-      }
-    } else {
-      return res.status(400).json({ error: 'No se encontró el saldo inicial del día. Debes ingresar el saldo inicial primero (puede ser $0.00).' });
-    }
+
+    const desdeFecha = ultimoResetBancos.createdAt;
+
+    let saldoInicialTarjetaAzteca = parseFloat(ultimoResetBancos.saldoFinalTarjetaAzteca || ultimoResetBancos.saldoInicialTarjetaAzteca || 0);
+    let saldoInicialTarjetaBbva = parseFloat(ultimoResetBancos.saldoFinalTarjetaBbva || ultimoResetBancos.saldoInicialTarjetaBbva || 0);
+    let saldoInicialTarjetaMp = parseFloat(ultimoResetBancos.saldoFinalTarjetaMp || ultimoResetBancos.saldoInicialTarjetaMp || 0);
+
+    let saldoInicialTransferenciaAzteca = parseFloat(ultimoResetBancos.saldoFinalTransferenciaAzteca || 0);
+    let saldoInicialTransferenciaBbva = parseFloat(ultimoResetBancos.saldoFinalTransferenciaBbva || 0);
+    let saldoInicialTransferenciaMp = parseFloat(ultimoResetBancos.saldoFinalTransferenciaMp || 0);
+
+    // Buscar ultimo corte general para referencia
+    const ultimoCorte = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: { not: null } },
+      orderBy: { createdAt: 'desc' }
+    });
+    const saldoInicialDelDia = await prisma.corteCaja.findFirst({
+      where: { fecha: { gte: hoy, lte: mañana }, hora: null },
+      orderBy: { createdAt: 'desc' }
+    });
 
     // Obtener ventas con tarjeta y transferencia
     const ventas = await prisma.venta.findMany({
@@ -3163,7 +2785,7 @@ const procesarCorteBancos = async (req, res) => {
     const ventasTransferenciaMp = ventas
       .filter(v => getMetodoBase(v.metodoPago) === 'transferencia' && getBanco(v) === 'Mercado Pago')
       .reduce((sum, v) => sum + parseFloat(v.total), 0);
-    
+
     // Calcular gastos por banco
     const gastosTarjetaAzteca = gastos
       .filter(g => g.metodoPago === 'tarjeta' && g.banco === 'Azteca')
@@ -3183,7 +2805,7 @@ const procesarCorteBancos = async (req, res) => {
     const gastosTransferenciaMp = gastos
       .filter(g => g.metodoPago === 'transferencia' && g.banco === 'Mercado Pago')
       .reduce((sum, g) => sum + parseFloat(g.monto), 0);
-    
+
     // Calcular saldos finales por banco
     const saldoFinalTarjetaAzteca = saldoInicialTarjetaAzteca + ventasTarjetaAzteca - gastosTarjetaAzteca;
     const saldoFinalTarjetaBbva = saldoInicialTarjetaBbva + ventasTarjetaBbva - gastosTarjetaBbva;
@@ -3191,17 +2813,17 @@ const procesarCorteBancos = async (req, res) => {
     const saldoFinalTransferenciaAzteca = saldoInicialTransferenciaAzteca + ventasTransferenciaAzteca - gastosTransferenciaAzteca;
     const saldoFinalTransferenciaBbva = saldoInicialTransferenciaBbva + ventasTransferenciaBbva - gastosTransferenciaBbva;
     const saldoFinalTransferenciaMp = saldoInicialTransferenciaMp + ventasTransferenciaMp - gastosTransferenciaMp;
-    
+
     // Los saldos finales ingresados por el usuario son TOTALES (tarjeta + transferencia)
     const saldoFinalAztecaTotal = parseFloat(saldoFinalAzteca);
     const saldoFinalBbvaTotal = parseFloat(saldoFinalBbva);
     const saldoFinalMpTotal = parseFloat(saldoFinalMp);
-    
+
     // Calcular los saldos finales calculados (tarjeta + transferencia)
     const saldoFinalAztecaCalculado = saldoFinalTarjetaAzteca + saldoFinalTransferenciaAzteca;
     const saldoFinalBbvaCalculado = saldoFinalTarjetaBbva + saldoFinalTransferenciaBbva;
     const saldoFinalMpCalculado = saldoFinalTarjetaMp + saldoFinalTransferenciaMp;
-    
+
     console.log('=== DEBUG PROCESAR CORTE BANCOS ===');
     console.log('Saldo Final Azteca Total (usuario):', saldoFinalAztecaTotal);
     console.log('Saldo Final Azteca Calculado:', saldoFinalAztecaCalculado);
@@ -3211,7 +2833,7 @@ const procesarCorteBancos = async (req, res) => {
     console.log('Saldo Inicial Transferencia Azteca:', saldoInicialTransferenciaAzteca);
     console.log('Ventas Tarjeta Azteca:', ventasTarjetaAzteca);
     console.log('Ventas Transferencia Azteca:', ventasTransferenciaAzteca);
-    
+
     // Distribuir el saldo final total ingresado por el usuario proporcionalmente entre tarjeta y transferencia
     // IMPORTANTE: Si el usuario ingresó 0, ambos (tarjeta y transferencia) deben ser 0
     let saldoFinalTarjetaAztecaGuardar = 0;
@@ -3220,7 +2842,7 @@ const procesarCorteBancos = async (req, res) => {
     let saldoFinalTransferenciaAztecaGuardar = 0;
     let saldoFinalTransferenciaBbvaGuardar = 0;
     let saldoFinalTransferenciaMpGuardar = 0;
-    
+
     // Si el usuario ingresó 0, ambos (tarjeta y transferencia) deben ser 0
     if (Math.abs(saldoFinalAztecaTotal) < 0.01) {
       console.log('Usuario ingresó 0 para Azteca, estableciendo ambos en 0');
@@ -3244,7 +2866,7 @@ const procesarCorteBancos = async (req, res) => {
         saldoFinalTransferenciaAztecaGuardar = saldoFinalAztecaTotal / 2;
       }
     }
-    
+
     // Si el usuario ingresó 0, ambos (tarjeta y transferencia) deben ser 0
     if (Math.abs(saldoFinalBbvaTotal) < 0.01) {
       console.log('Usuario ingresó 0 para BBVA, estableciendo ambos en 0');
@@ -3266,7 +2888,7 @@ const procesarCorteBancos = async (req, res) => {
         saldoFinalTransferenciaBbvaGuardar = saldoFinalBbvaTotal / 2;
       }
     }
-    
+
     // Si el usuario ingresó 0, ambos (tarjeta y transferencia) deben ser 0
     if (Math.abs(saldoFinalMpTotal) < 0.01) {
       console.log('Usuario ingresó 0 para Mercado Pago, estableciendo ambos en 0');
@@ -3288,17 +2910,35 @@ const procesarCorteBancos = async (req, res) => {
         saldoFinalTransferenciaMpGuardar = saldoFinalMpTotal / 2;
       }
     }
-    
-    // Obtener saldo de efectivo del último corte para mantenerlo
-    let saldoFinalEfectivo = 0;
-    if (ultimoCorte) {
-      saldoFinalEfectivo = parseFloat(ultimoCorte.saldoFinalEfectivo || 0);
-    } else if (saldoInicialDelDia) {
-      saldoFinalEfectivo = parseFloat(saldoInicialDelDia.saldoInicialEfectivo || 0);
-    }
-    
+
+    // --- Calcular saldo de efectivo para el snapshot (MULTIDÍA) ---
+    const ultimoResetEfectivo = await prisma.corteCaja.findFirst({
+      where: {
+        OR: [
+          { hora: null },
+          { AND: [{ hora: { not: null } }, { ventasEfectivo: { gt: 0 } }] },
+          { AND: [{ hora: { not: null } }, { ventasTarjeta: 0 }, { ventasTransferencia: 0 }] }
+        ]
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const desdeFechaEfectivo = ultimoResetEfectivo ? ultimoResetEfectivo.createdAt : hoy;
+    const ventasEfectivoSnapshot = await prisma.venta.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { total: true }
+    });
+    const gastosEfectivoSnapshot = await prisma.gasto.findMany({
+      where: { createdAt: { gte: desdeFechaEfectivo }, metodoPago: 'efectivo' },
+      select: { monto: true }
+    });
+
+    const sumVE = ventasEfectivoSnapshot.reduce((sum, v) => sum + parseFloat(v.total), 0);
+    const sumGE = gastosEfectivoSnapshot.reduce((sum, g) => sum + parseFloat(g.monto), 0);
+    const saldoFinalEfectivoActual = (ultimoResetEfectivo ? parseFloat(ultimoResetEfectivo.saldoFinalEfectivo || ultimoResetEfectivo.saldoInicialEfectivo || 0) : 0) + sumVE - sumGE;
+
     const saldoFinalTransferencia = saldoFinalTransferenciaAztecaGuardar + saldoFinalTransferenciaBbvaGuardar + saldoFinalTransferenciaMpGuardar;
-    const saldoFinalTotal = saldoFinalEfectivo + saldoFinalAztecaTotal + saldoFinalBbvaTotal + saldoFinalMpTotal;
+    const saldoFinalTotal = saldoFinalEfectivoActual + saldoFinalAztecaTotal + saldoFinalBbvaTotal + saldoFinalMpTotal;
     const totalVentas = ventasTarjetaAzteca + ventasTarjetaBbva + ventasTarjetaMp + ventasTransferenciaAzteca + ventasTransferenciaBbva + ventasTransferenciaMp;
 
     console.log('=== VALORES A GUARDAR ===');
@@ -3331,29 +2971,25 @@ const procesarCorteBancos = async (req, res) => {
         ventasTransferenciaMp: ventasTransferenciaMp,
         totalVentas: totalVentas,
         saldoFinal: saldoFinalTotal,
-        saldoFinalEfectivo: saldoFinalEfectivo,
-        saldoFinalTarjetaAzteca: saldoFinalTarjetaAztecaGuardar,
-        saldoFinalTarjetaBbva: saldoFinalTarjetaBbvaGuardar,
-        saldoFinalTarjetaMp: saldoFinalTarjetaMpGuardar,
-        saldoFinalTransferencia: saldoFinalTransferencia,
-        saldoFinalTransferenciaAzteca: saldoFinalTransferenciaAztecaGuardar,
-        saldoFinalTransferenciaBbva: saldoFinalTransferenciaBbvaGuardar,
-        saldoFinalTransferenciaMp: saldoFinalTransferenciaMpGuardar,
+        saldoFinalEfectivo: saldoFinalEfectivoActual,
+        saldoFinalTarjetaAzteca: 0,
+        saldoFinalTarjetaBbva: 0,
+        saldoFinalTarjetaMp: 0,
+        saldoFinalTransferencia: 0,
+        saldoFinalTransferenciaAzteca: 0,
+        saldoFinalTransferenciaBbva: 0,
+        saldoFinalTransferenciaMp: 0,
         diferencia: 0, // No hay diferencia en corte de bancos
         observaciones: observaciones || null,
         usuarioId: req.session.user?.id || null,
       },
     });
 
-    // Obtener saldo final de efectivo después del corte (mantener el saldo actual de efectivo)
-    const saldoFinalEfectivoDespuesCorte = saldoFinalEfectivo;
-    
-    res.json({ 
-      success: true, 
-      requiereSaldoInicial: true,
+    res.json({
+      success: true,
+      requiereSaldoInicial: false, // Los cortes de bancos no reinician el cajón de efectivo
       esFinDia: false,
-      saldoFinalEfectivo: saldoFinalEfectivoDespuesCorte,
-      preguntaRetiro: true // Indicar que debe preguntar si desea hacer retiro
+      saldoFinalEfectivo: saldoFinalEfectivoActual
     });
   } catch (error) {
     console.error('Error al procesar corte de bancos:', error);
